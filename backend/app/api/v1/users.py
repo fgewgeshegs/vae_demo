@@ -31,6 +31,7 @@ async def get_profile(
         profile = SP(user_id=current_user.id, profile_data={})
         db.add(profile)
         await db.flush()
+        await db.commit()
         await db.refresh(profile)
 
     return StudentProfileResponse.model_validate(profile)

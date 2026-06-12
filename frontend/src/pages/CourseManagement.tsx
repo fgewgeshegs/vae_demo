@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react'
-import { Card, Row, Col, Typography, Spin, Empty, Button, Modal, Form, Input, Tag, List, message, Upload } from 'antd'
-import { PlusOutlined, BookOutlined, UploadOutlined, DeleteOutlined } from '@ant-design/icons'
+import { Card, Row, Col, Typography, Spin, Empty, Button, Modal, Form, Input, Tag, List, message } from 'antd'
+import { PlusOutlined, BookOutlined, DeleteOutlined } from '@ant-design/icons'
 import { courseApi, chapterApi, documentApi } from '../services/api'
 import type { Course, Chapter, Document } from '../types'
 
@@ -15,6 +15,11 @@ const CourseManagement: React.FC = () => {
   const [chapters, setChapters] = useState<Chapter[]>([])
   const [documents, setDocuments] = useState<Document[]>([])
   const [detailLoading, setDetailLoading] = useState(false)
+
+  // 删除确认对话框状态
+  const [deleteModalOpen, setDeleteModalOpen] = useState(false)
+  const [deleting, setDeleting] = useState(false)
+  const [courseToDelete, setCourseToDelete] = useState<Course | null>(null)
 
   const fetchCourses = async () => {
     try {
@@ -38,8 +43,9 @@ const CourseManagement: React.FC = () => {
       setModalOpen(false)
       form.resetFields()
       fetchCourses()
-    } catch {
-      message.error('创建失败')
+    } catch (e: any) {
+      const detail = e?.response?.data?.detail || e?.message || '创建失败'
+      message.error(detail)
     }
   }
 
@@ -60,14 +66,32 @@ const CourseManagement: React.FC = () => {
     }
   }
 
-  const handleDeleteCourse = async (courseId: number) => {
+  const showDeleteConfirm = (course: Course) => {
+    setCourseToDelete(course)
+    setDeleteModalOpen(true)
+  }
+
+  const handleDeleteConfirm = async () => {
+    if (!courseToDelete) return
+    setDeleting(true)
     try {
-      await courseApi.delete(courseId)
+      await courseApi.delete(courseToDelete.id)
       message.success('删除成功')
+      setDeleteModalOpen(false)
+      setCourseToDelete(null)
+      if (selectedCourse?.id === courseToDelete.id) setSelectedCourse(null)
       fetchCourses()
-    } catch {
-      message.error('删除失败')
+    } catch (e: any) {
+      const detail = e?.response?.data?.detail || e?.message || '未知错误'
+      message.error(`删除失败: ${detail}`)
+    } finally {
+      setDeleting(false)
     }
+  }
+
+  const handleDeleteCancel = () => {
+    setDeleteModalOpen(false)
+    setCourseToDelete(null)
   }
 
   if (loading) {
@@ -103,7 +127,7 @@ const CourseManagement: React.FC = () => {
                     查看详情
                   </Button>,
                   <Button type="link" key="delete" danger icon={<DeleteOutlined />}
-                    onClick={() => handleDeleteCourse(course.id)}>
+                    onClick={() => showDeleteConfirm(course)}>
                     删除
                   </Button>,
                 ]}
@@ -123,6 +147,21 @@ const CourseManagement: React.FC = () => {
           ))}
         </Row>
       )}
+
+      {/* 删除确认弹窗 */}
+      <Modal
+        title="确认删除"
+        open={deleteModalOpen}
+        onOk={handleDeleteConfirm}
+        onCancel={handleDeleteCancel}
+        okText="确认删除"
+        cancelText="取消"
+        okButtonProps={{ danger: true, loading: deleting }}
+        maskClosable={!deleting}
+      >
+        <p>确定要删除课程「{courseToDelete?.title}」吗？</p>
+        <p style={{ color: '#ff4d4f', fontSize: 13 }}>此操作不可撤销，课程下的章节和知识点将一并删除。</p>
+      </Modal>
 
       {/* 课程详情 Modal */}
       <Modal

@@ -54,12 +54,17 @@ CREATE TABLE IF NOT EXISTS knowledge_points (
 CREATE TABLE IF NOT EXISTS documents (
     id SERIAL PRIMARY KEY,
     course_id INTEGER NOT NULL REFERENCES courses(id) ON DELETE CASCADE,
-    title VARCHAR(200) NOT NULL,
-    file_type VARCHAR(20) NOT NULL CHECK (file_type IN ('pdf', 'docx', 'pptx', 'md', 'txt')),
-    file_path VARCHAR(500) NOT NULL,
+    title VARCHAR(500) NOT NULL,
+    file_type VARCHAR(50) NOT NULL,
+    file_path VARCHAR(1000),
+    content TEXT,
+    summary TEXT,
     file_size BIGINT DEFAULT 0,
     page_count INTEGER DEFAULT 0,
-    status VARCHAR(20) DEFAULT 'pending' CHECK (status IN ('pending', 'processing', 'ready', 'error')),
+    status VARCHAR(20) DEFAULT 'pending',
+    user_id INTEGER REFERENCES users(id) ON DELETE SET NULL,
+    knowledge_point_id INTEGER REFERENCES knowledge_points(id) ON DELETE SET NULL,
+    metadata JSONB DEFAULT '{}',
     created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
     updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );

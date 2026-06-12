@@ -11,6 +11,8 @@ from app.core.security import get_current_user
 from app.models.user import User
 from app.models.evaluation import Evaluation
 from app.schemas.evaluation import EvaluationResponse
+from app.agents.eval_agent import EvalAgent
+from app.services.behavior_service import BehaviorService, ActionType
 
 router = APIRouter()
 
@@ -47,6 +49,32 @@ async def get_latest_evaluation(
     if not evaluation:
         raise HTTPException(status_code=404, detail="暂无评估数据")
     return EvaluationResponse.model_validate(evaluation)
+
+
+@router.post("/generate", response_model=dict)
+async def generate_evaluation(
+    course_id: int | None = None,
+    current_user: User = Depends(get_current_user),
+):
+    """生成学习评估报告"""
+    agent = EvalAgent()
+    result = await agent.process({
+        "user_id": current_user.id,
+        "course_id": course_id,
+        "message": "生成评估",
+    })
+
+    # 记录行为
+    if result.get("evaluation"):
+        await BehaviorService.record(
+            user_id=current_user.id,
+            action_type=ActionType.GENERATE_EVALUATION,
+            target_type="evaluation",
+            target_id=result["evaluation"].get("id"),
+            metadata={"course_id": course_id},
+        )
+
+    return result
 
 
 @router.get("/{eval_id}", response_model=EvaluationResponse)

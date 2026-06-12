@@ -59,8 +59,14 @@ async def create_course(
     """创建课程"""
     course = Course(**data.model_dump())
     db.add(course)
-    await db.flush()
-    await db.refresh(course)
+    await db.commit()
+    # 重新查询，预加载 chapters 避免 Pydantic 验证时触发 async 懒加载
+    result = await db.execute(
+        select(Course)
+        .where(Course.id == course.id)
+        .options(selectinload(Course.chapters))
+    )
+    course = result.scalar_one()
     return CourseResponse.model_validate(course)
 
 
@@ -76,3 +82,4 @@ async def delete_course(
     if not course:
         raise HTTPException(status_code=404, detail="课程不存在")
     await db.delete(course)
+    await db.commit()

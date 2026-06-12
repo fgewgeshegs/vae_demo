@@ -19,7 +19,7 @@ class QARecordResponse(BaseModel):
     question: str
     answer: str | None = None
     resource_ids: list[int] | None = None
-    metadata: dict | None = None
+    metadata: dict | None = Field(default=None, validation_alias="qa_metadata")
     created_at: datetime
 
-    model_config = ConfigDict(from_attributes=True)
+    model_config = ConfigDict(from_attributes=True, populate_by_name=True)

@@ -122,6 +122,7 @@ export const qaApi = {
   ask: (question: string, courseId?: number) =>
     api.post<QARecord>('/qa/ask', { question, course_id: courseId }),
   get: (id: number) => api.get<QARecord>(`/qa/${id}`),
+  count: () => api.get<{ count: number }>('/qa/count'),
 }
 
 // ========== 评估 API ==========
@@ -131,6 +132,8 @@ export const evaluationApi = {
   latest: (courseId?: number) =>
     api.get<Evaluation>('/evaluations/latest', { params: { course_id: courseId } }),
   get: (id: number) => api.get<Evaluation>(`/evaluations/${id}`),
+  generate: (courseId?: number) =>
+    api.post('/evaluations/generate', null, { params: { course_id: courseId } }),
 }
 
 // ========== 系统配置 API ==========
@@ -145,6 +148,22 @@ export const configApi = {
 export const searchApi = {
   search: (q: string, courseId?: number) =>
     api.get('/search/', { params: { q, course_id: courseId } }),
+}
+
+// ========== 学习行为 API ==========
+export const behaviorApi = {
+  record: (actionType: string, targetType?: string, targetId?: number, durationSeconds?: number) =>
+    api.post('/behaviors/record', null, {
+      params: {
+        action_type: actionType,
+        target_type: targetType,
+        target_id: targetId,
+        duration_seconds: durationSeconds || 0,
+      },
+    }),
+  stats: () => api.get('/behaviors/stats'),
+  recent: (limit?: number) =>
+    api.get('/behaviors/recent', { params: { limit: limit || 20 } }),
 }
 
 export default api

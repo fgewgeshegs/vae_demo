@@ -1,4 +1,4 @@
-﻿import React, { useEffect, useState } from 'react'
+import React, { useEffect, useState } from 'react'
 import { Row, Col, Card, Statistic, List, Typography, Tag, Spin, Empty, Progress } from 'antd'
 import {
   BookOutlined,
@@ -9,7 +9,7 @@ import {
   ClockCircleOutlined,
 } from '@ant-design/icons'
 import { useNavigate } from 'react-router-dom'
-import { courseApi, evaluationApi, studyPathApi, qaApi } from '../services/api'
+import { courseApi, evaluationApi, studyPathApi, qaApi, resourceApi, behaviorApi } from '../services/api'
 import type { Course, StudyPath, QARecord } from '../types'
 import { useAuthStore } from '../store'
 
@@ -21,29 +21,75 @@ const Dashboard: React.FC = () => {
   const [courses, setCourses] = useState<Course[]>([])
   const [paths, setPaths] = useState<StudyPath[]>([])
   const [recentQA, setRecentQA] = useState<QARecord[]>([])
+  const [qaCount, setQaCount] = useState(0)
   const [latestEval, setLatestEval] = useState<any>(null)
+  const [resourceCount, setResourceCount] = useState(0)
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
     const fetchData = async () => {
       try {
-        const [coursesRes, pathsRes, qaRes] = await Promise.all([
-          courseApi.list(),
-          studyPathApi.list(),
-          qaApi.list(),
-        ])
-        setCourses(coursesRes.data)
-        setPaths(pathsRes.data)
-        setRecentQA(qaRes.data.slice(0, 5))
-
-        try {
-          const evalRes = await evaluationApi.latest()
-          setLatestEval(evalRes.data)
-        } catch {
-          // 无评估数据
+        // 独立加载各模块数据，单个接口失败不影响其他模块
+        const loadCourses = async () => {
+          try {
+            const res = await courseApi.list()
+            setCourses(res.data)
+          } catch (e) {
+            console.error('课程加载失败:', e)
+          }
         }
-      } catch {
-        // 处理错误
+
+        const loadPaths = async () => {
+          try {
+            const res = await studyPathApi.list()
+            setPaths(res.data)
+          } catch (e) {
+            console.error('学习路径加载失败:', e)
+          }
+        }
+
+        const loadQA = async () => {
+          try {
+            const res = await qaApi.list()
+            setRecentQA(res.data.slice(0, 5))
+            // 获取问答总次数
+            const countRes = await qaApi.count()
+            setQaCount(countRes.data.count)
+          } catch (e) {
+            console.error('问答加载失败:', e)
+          }
+        }
+
+        const loadResources = async () => {
+          try {
+            const res = await resourceApi.list()
+            setResourceCount(res.data.length)
+          } catch (e) {
+            console.error('资源加载失败:', e)
+          }
+        }
+
+        const loadEval = async () => {
+          try {
+            const res = await evaluationApi.latest()
+            setLatestEval(res.data)
+          } catch {
+            // 无评估数据，忽略
+          }
+        }
+
+        await Promise.all([
+          loadCourses(),
+          loadPaths(),
+          loadQA(),
+          loadResources(),
+          loadEval(),
+        ])
+
+        // 记录登录行为（无需等待）
+        behaviorApi.record('view_dashboard').catch(() => {})
+      } catch (e) {
+        console.error('仪表盘加载异常:', e)
       } finally {
         setLoading(false)
       }
@@ -73,12 +119,12 @@ const Dashboard: React.FC = () => {
         </Col>
         <Col xs={24} sm={12} lg={6}>
           <Card hoverable onClick={() => navigate('/resources')}>
-            <Statistic title="学习资源" value={0} prefix={<FileTextOutlined />} />
+            <Statistic title="学习资源" value={resourceCount} prefix={<FileTextOutlined />} />
           </Card>
         </Col>
         <Col xs={24} sm={12} lg={6}>
           <Card hoverable onClick={() => navigate('/qa')}>
-            <Statistic title="问答次数" value={recentQA.length} prefix={<QuestionCircleOutlined />} />
+            <Statistic title="问答次数" value={qaCount} prefix={<QuestionCircleOutlined />} />
           </Card>
         </Col>
         <Col xs={24} sm={12} lg={6}>

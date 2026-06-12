@@ -102,12 +102,16 @@ class CoordinatorAgent:
 
     async def _handle_resource(self, state: AgentState) -> AgentState:
         """处理资源生成意图"""
-        state["result"] = {"type": "resource", "message": "资源生成功能将在 Phase 4 实现"}
+        from app.agents.resource_agent import ResourceCoordinator
+        coordinator = ResourceCoordinator()
+        state["result"] = await coordinator.process(state)
         return state
 
     async def _handle_path(self, state: AgentState) -> AgentState:
         """处理路径规划意图"""
-        state["result"] = {"type": "path", "message": "路径规划功能将在 Phase 4 实现"}
+        from app.agents.path_agent import PathAgent
+        agent = PathAgent()
+        state["result"] = await agent.process(state)
         return state
 
     async def _handle_qa(self, state: AgentState) -> AgentState:
@@ -119,7 +123,9 @@ class CoordinatorAgent:
 
     async def _handle_eval(self, state: AgentState) -> AgentState:
         """处理评估意图"""
-        state["result"] = {"type": "eval", "message": "评估功能将在 Phase 5 实现"}
+        from app.agents.eval_agent import EvalAgent
+        agent = EvalAgent()
+        state["result"] = await agent.process(state)
         return state
 
     async def process(self, user_id: int, course_id: int | None, message: str) -> dict:

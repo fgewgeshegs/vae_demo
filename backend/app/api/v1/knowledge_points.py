@@ -55,6 +55,7 @@ async def create_knowledge_point(
     kp = KnowledgePoint(**data.model_dump())
     db.add(kp)
     await db.flush()
+    await db.commit()
     await db.refresh(kp)
     return KnowledgePointResponse.model_validate(kp)
 
@@ -71,3 +72,4 @@ async def delete_knowledge_point(
     if not kp:
         raise HTTPException(status_code=404, detail="知识点不存在")
     await db.delete(kp)
+    await db.commit()

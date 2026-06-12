@@ -71,5 +71,6 @@ async def update_study_path(
     for key, value in update_data.items():
         setattr(path, key, value)
     await db.flush()
+    await db.commit()
     await db.refresh(path)
     return StudyPathResponse.model_validate(path)

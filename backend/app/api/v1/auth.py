@@ -42,6 +42,7 @@ async def register(data: UserCreate, db: AsyncSession = Depends(get_db)):
     )
     db.add(user)
     await db.flush()
+    await db.commit()
     await db.refresh(user)
 
     # 创建初始画像
@@ -60,6 +61,7 @@ async def register(data: UserCreate, db: AsyncSession = Depends(get_db)):
     )
     db.add(profile)
     await db.flush()
+    await db.commit()
 
     token = create_access_token({"sub": str(user.id)})
     return TokenResponse(

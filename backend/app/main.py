@@ -12,6 +12,7 @@ from loguru import logger
 from app.core.config import settings
 from app.core.database import init_db, close_db
 from app.api.v1 import v1_router
+from knowledge_base.seed_courses import seed_course
 
 
 @asynccontextmanager
@@ -20,6 +21,7 @@ async def lifespan(app: FastAPI):
     logger.info(f"启动 {settings.APP_NAME} v{settings.APP_VERSION}")
     logger.info(f"LLM 供应商: {settings.LLM_PROVIDER}")
     await init_db()
+    await seed_course()
     yield
     await close_db()
     logger.info("应用已关闭")

@@ -15,7 +15,7 @@ class Document(Base):
     """文档模型"""
     __tablename__ = "documents"
 
-    id: Mapped[int] = mapped_column(primary_key=True)
+    id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True)
     title: Mapped[str] = mapped_column(String(500))
     file_type: Mapped[str] = mapped_column(String(50))
     file_path: Mapped[str | None] = mapped_column(String(1000))

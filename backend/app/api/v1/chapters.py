@@ -67,6 +67,7 @@ async def create_chapter(
     chapter = Chapter(**data.model_dump())
     db.add(chapter)
     await db.flush()
+    await db.commit()
     await db.refresh(chapter)
     return ChapterResponse.model_validate(chapter)
 
@@ -87,6 +88,7 @@ async def update_chapter(
     for key, value in data.model_dump(exclude_unset=True).items():
         setattr(chapter, key, value)
     await db.flush()
+    await db.commit()
     await db.refresh(chapter)
     return ChapterResponse.model_validate(chapter)
 
@@ -103,3 +105,4 @@ async def delete_chapter(
     if not chapter:
         raise HTTPException(status_code=404, detail="章节不存在")
     await db.delete(chapter)
+    await db.commit()

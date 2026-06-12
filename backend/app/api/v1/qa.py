@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from fastapi import APIRouter, Depends, HTTPException
-from sqlalchemy import select
+from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.database import get_db
@@ -12,6 +12,8 @@ from app.core.llm_gateway import get_llm_gateway, LLMGateway
 from app.models.user import User
 from app.models.qa_record import QARecord
 from app.schemas.qa_record import QARecordCreate, QARecordResponse
+from app.agents.qa_agent import QAAgent
+from app.services.behavior_service import BehaviorService, ActionType
 
 router = APIRouter()
 
@@ -39,26 +41,52 @@ async def ask_question(
     current_user: User = Depends(get_current_user),
     llm: LLMGateway = Depends(get_llm_gateway),
 ):
-    """提问并获取回答"""
-    # 调用 LLM
-    response = await llm.chat(
-        messages=[{"role": "user", "content": data.question}],
-        system_prompt="你是一个 AI 学习助手，帮助学习者理解知识点。请用中文回答，结合费曼学习法，引导式解答。",
-        temperature=0.7,
-    )
+    """提问并获取回答（使用 QAAgent 进行画像感知的回答）"""
+    # 使用 QAAgent 获取画像感知的回答
+    qa_agent = QAAgent()
+    agent_result = await qa_agent.process({
+        "user_id": current_user.id,
+        "course_id": data.course_id,
+        "message": data.question,
+    })
+
+    answer = agent_result.get("answer", "")
 
     # 保存记录
     record = QARecord(
         user_id=current_user.id,
         course_id=data.course_id,
         question=data.question,
-        answer=response.content,
-        metadata=data.metadata,
+        answer=answer,
+        qa_metadata=data.metadata,
     )
     db.add(record)
     await db.flush()
+    await db.commit()
     await db.refresh(record)
+
+    # 记录行为
+    await BehaviorService.record(
+        user_id=current_user.id,
+        action_type=ActionType.ASK_QUESTION,
+        target_type="qa_record",
+        target_id=record.id,
+        metadata={"course_id": data.course_id},
+    )
+
     return QARecordResponse.model_validate(record)
+
+
+@router.get("/count")
+async def count_qa_records(
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """获取当前用户的问答记录总数"""
+    query = select(func.count()).select_from(QARecord).where(QARecord.user_id == current_user.id)
+    result = await db.execute(query)
+    count = result.scalar()
+    return {"count": count}
 
 
 @router.get("/{record_id}", response_model=QARecordResponse)

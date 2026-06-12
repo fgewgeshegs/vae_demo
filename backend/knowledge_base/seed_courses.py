@@ -174,6 +174,7 @@ async def seed_course():
                 )
                 db.add(kp)
 
+        await db.commit()
         print(f"种子课程《{SEED_COURSE['title']}》入库成功")
 
 

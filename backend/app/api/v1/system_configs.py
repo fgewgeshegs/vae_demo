@@ -58,6 +58,7 @@ async def update_config(
         db.add(config)
 
     await db.flush()
+    await db.commit()
     await db.refresh(config)
     return SystemConfigResponse.model_validate(config)
 

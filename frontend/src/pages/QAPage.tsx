@@ -18,9 +18,10 @@ const QAPage: React.FC = () => {
     const fetchQA = async () => {
       try {
         const res = await qaApi.list()
-        setRecords(res.data)
-      } catch {
-        // 处理错误
+        // API 返回最新的在前，反转后按时间正序显示（旧→新）
+        setRecords(res.data.reverse())
+      } catch (e) {
+        console.error('问答历史加载失败:', e)
       } finally {
         setLoading(false)
       }
@@ -39,7 +40,8 @@ const QAPage: React.FC = () => {
     setSending(true)
     try {
       const res = await qaApi.ask(question.trim())
-      setRecords((prev) => [res.data, ...prev])
+      // 追加到末尾（最新消息在底部）
+      setRecords((prev) => [...prev, res.data])
       setQuestion('')
     } catch {
       message.error('发送失败')
