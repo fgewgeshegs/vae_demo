@@ -74,20 +74,42 @@ class CoordinatorAgent:
         return state.get("intent", "unknown")
 
     async def _intent_classify(self, state: AgentState) -> AgentState:
-        """意图分类"""
+        """意图分类 - 基于关键词匹配"""
         message = state.get("message", "").lower()
-        intent = "unknown"
+        intent = "qa"  # 默认走 QA
 
-        if any(kw in message for kw in ["画像", "我的情况", "我的水平", "了解我"]):
+        # Profile - 用户画像相关
+        if any(kw in message for kw in [
+            "画像", "我的情况", "我的水平",
+            "了解我", "分析我",
+        ]):
             intent = "profile"
-        elif any(kw in message for kw in ["生成资源", "讲义", "思维导图", "练习题", "代码案例", "拓展阅读", "学习资料", "生成"]):
+
+        # Resource - 资源生成相关
+        elif any(kw in message for kw in [
+            "生成资源", "生成学习资料", "生成资料",
+            "讲义", "思维导图", "练习题", "练习题目",
+            "代码案例", "代码示例", "拓展阅读",
+            "学习资料", "学习资源",
+            "出几道", "教学视频",
+        ]):
             intent = "resource"
-        elif any(kw in message for kw in ["学习路径", "学习计划", "先学什么", "计划"]):
+
+        # Path - 学习路径规划相关
+        elif any(kw in message for kw in [
+            "学习路径", "学习计划", "学习路线",
+            "学习规划", "先学什么",
+            "路线规划", "课程规划",
+        ]):
             intent = "path"
-        elif any(kw in message for kw in ["评估", "学习评估", "我的得分", "学习报告"]):
+
+        # Eval - 学习评估相关
+        elif any(kw in message for kw in [
+            "评估", "学习评估",
+            "我的得分", "学习报告", "学习效果",
+            "我的成绩", "我的进度",
+        ]):
             intent = "eval"
-        else:
-            intent = "qa"
 
         state["intent"] = intent
         logger.info(f"意图识别: {intent}")

@@ -1,6 +1,6 @@
-from fastapi import APIRouter
+﻿from fastapi import APIRouter
 
-from app.api.v1 import auth, users, courses, chapters, knowledge_points, documents, resources, study_paths, qa, evaluations, system_configs, search, behaviors
+from app.api.v1 import auth, users, courses, chapters, knowledge_points, documents, resources, study_paths, qa, evaluations, system_configs, search, behaviors, chat
 
 v1_router = APIRouter(prefix="/api/v1")
 
@@ -17,3 +17,4 @@ v1_router.include_router(evaluations.router, prefix="/evaluations", tags=["学�
 v1_router.include_router(system_configs.router, prefix="/settings", tags=["系统设置"])
 v1_router.include_router(search.router, prefix="/search", tags=["知识检索"])
 v1_router.include_router(behaviors.router, prefix="/behaviors", tags=["学习行为"])
+v1_router.include_router(chat.router, prefix="/chat", tags=["对话Agent"])
