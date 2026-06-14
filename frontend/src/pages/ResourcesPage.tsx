@@ -34,8 +34,8 @@ const ResourcesPage: React.FC = () => {
         if (typeFilter) params.resource_type = typeFilter
         const res = await resourceApi.list(params)
         setResources(res.data)
-      } catch {
-        // 处理错误
+      } catch (err) {
+        console.error('获取资源列表失败:', err)
       } finally {
         setLoading(false)
       }

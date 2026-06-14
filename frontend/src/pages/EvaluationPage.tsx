@@ -46,8 +46,8 @@ const EvaluationPage: React.FC = () => {
       ])
       setEvaluations(listRes.data)
       if (latestRes) setLatest(latestRes.data)
-    } catch {
-      // 处理错误
+    } catch (err) {
+      console.error('获取评估数据失败:', err)
     } finally {
       setLoading(false)
     }
@@ -62,8 +62,8 @@ const EvaluationPage: React.FC = () => {
     try {
       await evaluationApi.generate()
       await fetchData()
-    } catch {
-      // 处理错误
+    } catch (err) {
+      console.error('生成评估失败:', err)
     } finally {
       setGenerating(false)
     }

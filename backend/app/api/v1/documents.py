@@ -214,5 +214,5 @@ async def process_document(doc_id: int):
                 if doc:
                     doc.status = "error"
                     await db.commit()
-        except Exception:
-            pass
+        except Exception as e:
+            logger.warning(f"文档处理错误状态保存失败: {e}")

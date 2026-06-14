@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react'
-import { Card, Timeline, Tag, Typography, Spin, Empty, Button, Progress, Space } from 'antd'
-import { CheckCircleOutlined, ClockCircleOutlined, PlayCircleOutlined, BookOutlined } from '@ant-design/icons'
-import { studyPathApi } from '../services/api'
+import { Card, Timeline, Tag, Typography, Spin, Empty, Button, Progress, Space, message } from 'antd'
+import { CheckCircleOutlined, ClockCircleOutlined, PlayCircleOutlined, BookOutlined, ReloadOutlined } from '@ant-design/icons'
+import { studyPathApi, chatApi } from '../services/api'
 import type { StudyPath } from '../types'
 
 const { Title, Text } = Typography
@@ -9,20 +9,37 @@ const { Title, Text } = Typography
 const LearningPath: React.FC = () => {
   const [paths, setPaths] = useState<StudyPath[]>([])
   const [loading, setLoading] = useState(true)
+  const [generating, setGenerating] = useState(false)
 
   useEffect(() => {
     const fetchPaths = async () => {
       try {
         const res = await studyPathApi.list()
         setPaths(res.data)
-      } catch {
-        // 处理错误
+      } catch (err) {
+        console.error('获取学习路径失败:', err)
       } finally {
         setLoading(false)
       }
     }
     fetchPaths()
   }, [])
+
+  const handleGeneratePath = async () => {
+    setGenerating(true)
+    try {
+      const res = await chatApi.send('帮我生成学习路径')
+      message.success(res.data.message || '学习路径生成成功！')
+      // 刷新路径列表
+      const refreshed = await studyPathApi.list()
+      setPaths(refreshed.data)
+    } catch (err: unknown) {
+      const errMsg = err instanceof Error ? err.message : '请稍后重试'
+      message.error(`生成学习路径失败：${errMsg}`)
+    } finally {
+      setGenerating(false)
+    }
+  }
 
   if (loading) {
     return (
@@ -34,8 +51,10 @@ const LearningPath: React.FC = () => {
 
   if (paths.length === 0) {
     return (
-      <Empty description="暂无学习路径">
-        <Button type="primary" disabled>生成学习路径</Button>
+      <Empty description="暂无学习路径，点击下方按钮立即生成">
+        <Button type="primary" onClick={handleGeneratePath} loading={generating} icon={<ReloadOutlined />}>
+          {generating ? '正在生成...' : '生成学习路径'}
+        </Button>
       </Empty>
     )
   }

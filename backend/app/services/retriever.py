@@ -10,6 +10,7 @@ from app.core.database import async_session_factory
 from app.models.document import DocumentChunk
 from app.services.embedder import Embedder
 from app.services.vector_store import VectorStore
+from loguru import logger
 
 
 class Retriever:
@@ -62,7 +63,7 @@ class Retriever:
                             "score": score,
                             "method": "vector",
                         })
-            except Exception:
-                pass
+            except Exception as e:
+                logger.warning(f"向量检索失败: {e}")
 
         return results[:limit]

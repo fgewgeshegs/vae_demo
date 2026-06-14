@@ -36,7 +36,7 @@ class LearningResourceResponse(BaseModel):
     resource_type: str
     title: str
     content: str | None = None
-    metadata: dict | None = None
+    metadata: dict | None = Field(None, validation_alias="resource_metadata")
     is_generated: bool
     created_at: datetime
 

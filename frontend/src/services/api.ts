@@ -150,6 +150,15 @@ export const searchApi = {
     api.get('/search/', { params: { q, course_id: courseId } }),
 }
 
+// ========== 统一对话 API（经 Coordinator 路由到 PathAgent 等） ==========
+export const chatApi = {
+  send: (message: string, courseId?: number) =>
+    api.post<{ type: string; data: Record<string, unknown>; message: string }>('/chat', {
+      message,
+      course_id: courseId,
+    }),
+}
+
 // ========== 学习行为 API ==========
 export const behaviorApi = {
   record: (actionType: string, targetType?: string, targetId?: number, durationSeconds?: number) =>

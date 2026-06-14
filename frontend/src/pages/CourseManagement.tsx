@@ -25,8 +25,8 @@ const CourseManagement: React.FC = () => {
     try {
       const res = await courseApi.list()
       setCourses(res.data)
-    } catch {
-      // 处理错误
+    } catch (err) {
+      console.error('获取课程列表失败:', err)
     } finally {
       setLoading(false)
     }
@@ -59,8 +59,8 @@ const CourseManagement: React.FC = () => {
       ])
       setChapters(chRes.data)
       setDocuments(docRes.data)
-    } catch {
-      // 处理错误
+    } catch (err) {
+      console.error('获取章节/文档失败:', err)
     } finally {
       setDetailLoading(false)
     }

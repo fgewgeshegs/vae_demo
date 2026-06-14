@@ -60,6 +60,50 @@ class PathAgent:
         self.llm = LLMGateway()
         self.strategy_engine = LearningStrategyEngine()
 
+    def _generate_mock_path(self, course, chapters_with_kps: list[tuple]) -> dict:
+        """生成模拟学习路径（当 LLM 不可用时的降级方案）"""
+        nodes = []
+
+        for ch_title, kps in chapters_with_kps:
+            ch_key = ch_title.split("】")[-1].split("]")[-1].strip()  # 兼容 【/】 和 [/] 两种括号
+            for i, kp in enumerate(kps):
+                title = kp.title if hasattr(kp, 'title') else str(kp)
+                nodes.append({
+                    "title": title,
+                    "type": "learn",
+                    "estimated_minutes": 30,
+                })
+
+                # 每 3 个知识点后加一个练习节点
+                if (i + 1) % 3 == 0:
+                    nodes.append({
+                        "title": f"综合练习：{title}",
+                        "type": "practice",
+                        "estimated_minutes": 20,
+                    })
+
+            # 每章末尾加一个复习节点
+            if kps:
+                nodes.append({
+                    "title": f"章节复习：{ch_key}",
+                    "type": "review",
+                    "estimated_minutes": 15,
+                })
+
+        # 如果节点太少，补充一些通用节点
+        if len(nodes) < 4:
+            nodes.extend([
+                {"title": "知识梳理与总结", "type": "review", "estimated_minutes": 20},
+                {"title": "综合测试", "type": "exam", "estimated_minutes": 30},
+            ])
+
+        estimated_total = sum(n.get("estimated_minutes", 0) for n in nodes)
+        return {
+            "nodes": nodes,
+            "estimated_total_minutes": estimated_total,
+            "description": f"基于《{course.title}》课程生成的个性化学习路径，包含 {len(nodes)} 个学习节点，涵盖知识点学习、章节练习和复习巩固。",
+        }
+
     async def process(self, state: dict) -> dict:
         """生成学习路径"""
         user_id = state["user_id"]
@@ -123,12 +167,15 @@ class PathAgent:
                 chapters = chapter_result.scalars().all()
 
                 kp_list = []
+                chapters_with_kps = []
                 for ch in chapters:
                     kp_result = await db.execute(
                         select(KnowledgePoint).where(KnowledgePoint.chapter_id == ch.id)
                         .order_by(KnowledgePoint.sort_order)
                     )
-                    for kp in kp_result.scalars().all():
+                    ch_kps = kp_result.scalars().all()
+                    chapters_with_kps.append((ch.title, ch_kps))
+                    for kp in ch_kps:
                         kp_list.append(f"[{ch.title}] {kp.title}（难度：{kp.difficulty}）")
 
                 kp_text = "\n".join(kp_list) if kp_list else "暂无知识点数据"
@@ -175,7 +222,27 @@ class PathAgent:
             estimated_total = path_data.get("estimated_total_minutes", 0)
             description = path_data.get("description", "")
 
-            # 7. 保存到数据库
+        except (json.JSONDecodeError, Exception) as e:
+            logger.warning(f"LLM 路径规划失败，使用 Mock 降级数据: {e}")
+            # 降级：使用 Mock 数据生成学习路径
+            # 检查是否已有 target_course（可能在 DB 操作阶段就出错了）
+            target_course = locals().get('target_course')
+            if target_course is None:
+                return {"type": "path", "message": "暂无可用课程数据，请先创建课程后再生成学习路径。"}
+
+            try:
+                _ = chapters_with_kps
+            except NameError:
+                chapters_with_kps = []
+
+            mock_path = self._generate_mock_path(target_course, chapters_with_kps)
+            nodes = mock_path["nodes"]
+            estimated_total = mock_path["estimated_total_minutes"]
+            description = mock_path["description"]
+            strategies = [LearningStrategy.SPACED_REPETITION, LearningStrategy.FEYNMAN_TECHNIQUE]
+
+        # 7. 保存到数据库（统一保存，无论 LLM 成功还是降级）
+        try:
             async with async_session_factory() as db:
                 existing = await db.execute(
                     select(StudyPath).where(
@@ -194,6 +261,7 @@ class PathAgent:
                     course_id=target_course.id,
                     path_data={
                         "nodes": nodes,
+                        "current_index": 0,
                         "estimated_total_minutes": estimated_total,
                         "description": description,
                         "course_title": target_course.title,
@@ -216,10 +284,6 @@ class PathAgent:
                 ),
                 "path_id": study_path.id,
             }
-
-        except json.JSONDecodeError as e:
-            logger.error(f"路径规划 LLM 返回解析失败: {e}")
-            return {"type": "path", "message": "路径规划生成失败，请稍后重试。"}
         except Exception as e:
-            logger.error(f"PathAgent 错误: {e}")
-            return {"type": "path", "message": f"路径规划失败：{str(e)}"}
+            logger.error(f"PathAgent 保存失败: {e}")
+            return {"type": "path", "message": f"路径规划保存失败：{str(e)}"}

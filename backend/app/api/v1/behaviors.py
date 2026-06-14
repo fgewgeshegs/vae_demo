@@ -14,11 +14,6 @@ from app.services.behavior_service import BehaviorService, ActionType
 router = APIRouter()
 
 
-class BehaviorRecordRequest:
-    """行为记录请求"""
-    pass
-
-
 @router.post("/record", response_model=dict)
 async def record_behavior(
     action_type: str = Query(..., description="行为类型"),

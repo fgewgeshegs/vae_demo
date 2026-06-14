@@ -21,8 +21,8 @@ const ProfilePage: React.FC = () => {
       try {
         const res = await profileApi.get()
         setProfile(res.data)
-      } catch {
-        // 处理错误
+      } catch (err) {
+        console.error('获取画像失败:', err)
       } finally {
         setLoading(false)
       }

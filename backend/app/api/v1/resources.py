@@ -23,8 +23,8 @@ async def list_resources(
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
-    """获取学习资源列表（支持筛选）"""
-    query = select(LearningResource).where(LearningResource.user_id == current_user.id)
+    """获取学习资源列表（支持筛选，返回所有可见资源）"""
+    query = select(LearningResource)
 
     if course_id:
         query = query.where(LearningResource.course_id == course_id)

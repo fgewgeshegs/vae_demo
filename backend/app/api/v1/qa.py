@@ -8,7 +8,6 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.database import get_db
 from app.core.security import get_current_user
-from app.core.llm_gateway import get_llm_gateway, LLMGateway
 from app.models.user import User
 from app.models.qa_record import QARecord
 from app.schemas.qa_record import QARecordCreate, QARecordResponse
@@ -39,7 +38,6 @@ async def ask_question(
     data: QARecordCreate,
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_user),
-    llm: LLMGateway = Depends(get_llm_gateway),
 ):
     """提问并获取回答（使用 QAAgent 进行画像感知的回答）"""
     # 使用 QAAgent 获取画像感知的回答
