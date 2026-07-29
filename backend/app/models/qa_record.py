@@ -18,7 +18,7 @@ class QARecord(Base):
     course_id: Mapped[int | None] = mapped_column(ForeignKey("courses.id", ondelete="CASCADE"), nullable=True)
     question: Mapped[str] = mapped_column(Text, nullable=False)
     answer: Mapped[str | None] = mapped_column(Text, nullable=True)
-    conversation_id: Mapped[str | None] = mapped_column(String(36), index=True, nullable=True)
+    conversation_id: Mapped[str | None] = mapped_column(String(36), nullable=True)
     resource_ids: Mapped[list[int] | None] = mapped_column(ARRAY(Integer), default=list)
     qa_metadata: Mapped[dict | None] = mapped_column("metadata", JSONB, default=dict)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
