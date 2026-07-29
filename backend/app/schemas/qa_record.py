@@ -9,6 +9,7 @@ from pydantic import BaseModel, Field, ConfigDict
 class QARecordCreate(BaseModel):
     course_id: int | None = None
     question: str = Field(..., description="用户问题")
+    conversation_id: str | None = Field(default=None, max_length=36)
     metadata: dict = Field(default_factory=dict)
 
 
@@ -18,6 +19,7 @@ class QARecordResponse(BaseModel):
     course_id: int | None = None
     question: str
     answer: str | None = None
+    conversation_id: str | None = None
     resource_ids: list[int] | None = None
     metadata: dict | None = Field(default=None, validation_alias="qa_metadata")
     created_at: datetime

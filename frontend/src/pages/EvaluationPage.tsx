@@ -15,6 +15,7 @@ import TaskProgress from '../components/TaskProgress'
 import { evaluationApi } from '../services/api'
 import { useTaskRunner } from '../hooks/useTaskRunner'
 import type { Evaluation } from '../types'
+import WorkspacePageHeader from '../components/WorkspacePageHeader'
 
 const { Title, Text } = Typography
 
@@ -40,10 +41,10 @@ const averageScore = (scores: Record<string, number>) => {
 }
 
 const evaluationSource = (evaluation: Evaluation | null) => {
-  const method = String(evaluation?.report_data?.method || 'unknown')
-  if (method === 'llm') return { label: 'LLM', color: 'green' }
-  if (method === 'rule_fallback') return { label: '规则兜底', color: 'orange' }
-  return { label: 'unknown', color: 'default' }
+  const method = String(evaluation?.report_data?.method || '')
+  if (method === 'llm') return { label: '智能分析', color: 'green' }
+  if (method === 'rule_fallback') return { label: '学习记录', color: 'blue' }
+  return { label: '近期学习记录', color: 'blue' }
 }
 
 const EvaluationPage: React.FC = () => {
@@ -92,15 +93,9 @@ const EvaluationPage: React.FC = () => {
 
   return (
     <div className="workspace-page workspace-page--evaluation">
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16, gap: 16 }}>
-        <Title level={4} style={{ margin: 0 }}>
-          <BarChartOutlined style={{ marginRight: 8 }} />
-          学习评估
-        </Title>
-        <Button type="primary" icon={<ReloadOutlined />} loading={running} onClick={handleGenerate}>
+      <WorkspacePageHeader title="学习评估" description="基于近期学习行为，识别当前能力状态和下一步改进重点。" metrics={[{ label: '评估记录', value: evaluations.length }, { label: '当前得分', value: latest ? averageScore(latest.scores) : '—' }]} actions={<Button type="primary" icon={<ReloadOutlined />} loading={running} onClick={handleGenerate}>
           {running ? '评估 Agent 正在分析...' : 'Agent 生成新评估'}
-        </Button>
-      </div>
+        </Button>} />
 
       <TaskProgress task={activeTask} onClose={clearTask} />
 
@@ -121,7 +116,7 @@ const EvaluationPage: React.FC = () => {
                 <div style={{ marginTop: 24 }}>
                 <div style={{ marginBottom: 12, textAlign: 'right' }}>
                   <Tag color={evaluationSource(latest).color}>
-                    来源：{evaluationSource(latest).label}
+                    评估依据：{evaluationSource(latest).label}
                   </Tag>
                 </div>
                 {Object.entries(latest.scores).map(([key, value]) => (

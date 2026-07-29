@@ -12,6 +12,7 @@ import {
 import { chapterApi, courseApi, documentApi, knowledgePointApi, videoApi } from "../services/api"
 import type { VideoTask } from "../services/api"
 import type { Chapter, Course, Document, KnowledgePoint } from "../types"
+import WorkspacePageHeader from "../components/WorkspacePageHeader"
 
 const { Title, Text, Paragraph } = Typography
 
@@ -316,7 +317,7 @@ const CoursesPage: React.FC = () => {
 
   return (
     <div className="workspace-page workspace-page--courses">
-      <Title level={4}>课程管理</Title>
+      <WorkspacePageHeader title="课程管理" description="维护课程内容、章节资料与知识点，确保学习内容可持续更新。" metrics={[{ label: '课程数量', value: courses.length }]} />
       {courses.length === 0 ? (
         <Empty description="暂无课程" />
       ) : (

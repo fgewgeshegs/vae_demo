@@ -1,14 +1,15 @@
-import React, { useEffect, useState } from 'react'
+import React, { useEffect, useRef, useState } from 'react'
 import { Avatar, Breadcrumb, FloatButton, Layout } from 'antd'
 import { Outlet, useLocation, useNavigate } from 'react-router-dom'
 import {
   ApartmentOutlined, BookOutlined, CheckCircleOutlined, DashboardOutlined,
   FolderOpenOutlined, MenuFoldOutlined, MenuUnfoldOutlined, QuestionCircleOutlined, SettingOutlined,
-  ThunderboltOutlined, UserOutlined, VerticalAlignTopOutlined,
+  LogoutOutlined, ThunderboltOutlined, UserOutlined, VerticalAlignTopOutlined,
 } from '@ant-design/icons'
 import { useAuthStore } from '../store'
 import QuickThoughtFAB from './QuickThoughtFAB'
 import './AppLayout.css'
+import './AppLayoutOverrides.css'
 
 const { Content, Sider } = Layout
 
@@ -38,10 +39,13 @@ const pageNames: Record<string, string> = {
 const AppLayout: React.FC = () => {
   const navigate = useNavigate()
   const location = useLocation()
-  const { user } = useAuthStore()
+  const { user, logout } = useAuthStore()
   const [isMobile, setIsMobile] = useState(() => window.innerWidth < 768)
   const [sidebarOpen, setSidebarOpen] = useState(() => window.innerWidth >= 768)
   const [showTop, setShowTop] = useState(false)
+  const [profileMenuOpen, setProfileMenuOpen] = useState(false)
+  const [expandRailY, setExpandRailY] = useState(() => Math.round(window.innerHeight / 2))
+  const expandRailDidDrag = useRef(false)
 
   useEffect(() => {
     const onScroll = () => setShowTop(window.scrollY > 400)
@@ -68,6 +72,15 @@ const AppLayout: React.FC = () => {
     </button>
   }
 
+  const handleLogout = () => {
+    logout()
+    navigate('/login', { replace: true })
+  }
+
+  const moveExpandRail = (clientY: number) => {
+    setExpandRailY(Math.min(window.innerHeight - 44, Math.max(44, clientY)))
+  }
+
   return (
     <Layout className="workspace-layout">
       <Layout className="workspace-body">
@@ -90,7 +103,8 @@ const AppLayout: React.FC = () => {
             {systemItems.map(renderNavItem)}
           </nav>
           <div className="workspace-profile-card" title={user?.display_name || user?.username || '学习者'}>
-            <Avatar icon={<UserOutlined />} />
+            <button type="button" className="workspace-profile-trigger" onClick={() => setProfileMenuOpen((open) => !open)} title="账户菜单" aria-label="账户菜单"><Avatar icon={<UserOutlined />} /></button>
+            {profileMenuOpen && <button type="button" className="workspace-logout-button" onClick={handleLogout} title="退出登录"><LogoutOutlined /><span>退出登录</span></button>}
             <div><strong>{user?.display_name || user?.username || '学习者'}</strong><span>学习空间已就绪</span></div>
           </div>
         </Sider>
@@ -103,7 +117,6 @@ const AppLayout: React.FC = () => {
               </button>
               <div>
                 <Breadcrumb items={[{ title: '学习工作台' }, { title: pageNames[location.pathname] || '工作区' }]} />
-                <strong>{pageNames[location.pathname] || '工作区'}</strong>
               </div>
             </div>
             <button type="button" className="workspace-account-button" onClick={() => navigate('/profile')} aria-label="查看学习画像">
@@ -111,13 +124,13 @@ const AppLayout: React.FC = () => {
               <span>{user?.display_name || user?.username || '学习者'}</span>
             </button>
           </header>
-          <Content className={`workspace-content ${location.pathname === '/dashboard' ? 'workspace-content--dashboard' : 'workspace-content--workspace'}`}>
+          <Content className={`workspace-content ${location.pathname === '/dashboard' ? 'workspace-content--dashboard' : 'workspace-content--workspace'} ${location.pathname === '/qa' ? 'workspace-content--qa' : ''}`}>
             <div className="fade-in"><Outlet /></div>
           </Content>
         </Layout>
       </Layout>
 
-      {!sidebarOpen && <button type="button" className="workspace-expand-rail" onClick={() => setSidebarOpen(true)} title="展开导航"><MenuFoldOutlined /></button>}
+      {!sidebarOpen && <button type="button" className="workspace-expand-rail" style={{ top: expandRailY }} onClick={() => { if (!expandRailDidDrag.current) setSidebarOpen(true) }} onPointerDown={(event) => { expandRailDidDrag.current = false; event.currentTarget.setPointerCapture(event.pointerId) }} onPointerMove={(event) => { if (event.currentTarget.hasPointerCapture(event.pointerId)) { expandRailDidDrag.current = true; moveExpandRail(event.clientY) } }} onPointerUp={(event) => event.currentTarget.releasePointerCapture(event.pointerId)} title="拖动调整位置，点击展开导航"><MenuFoldOutlined /></button>}
       <QuickThoughtFAB />
       {showTop && <FloatButton icon={<VerticalAlignTopOutlined />} type="default" className="workspace-back-top" onClick={() => window.scrollTo({ top: 0, behavior: 'smooth' })} />}
     </Layout>

@@ -56,6 +56,12 @@ async def init_db():
             await conn.execute(
                 text("ALTER TABLE users ADD COLUMN IF NOT EXISTS is_admin BOOLEAN NOT NULL DEFAULT FALSE")
             )
+            await conn.execute(
+                text("ALTER TABLE qa_records ADD COLUMN IF NOT EXISTS conversation_id VARCHAR(36)")
+            )
+            await conn.execute(
+                text("CREATE INDEX IF NOT EXISTS idx_qa_records_conversation_id ON qa_records(conversation_id)")
+            )
             await conn.execute(text("CREATE INDEX IF NOT EXISTS idx_documents_user_id ON documents(user_id)"))
             await conn.execute(
                 text(

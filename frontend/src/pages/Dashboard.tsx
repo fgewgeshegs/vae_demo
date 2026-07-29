@@ -22,6 +22,7 @@ const shortcuts = [
   { label: '生成评估', icon: <RiseOutlined />, route: '/evaluation', tone: 'primary' },
   { label: '开始新对话', icon: <RobotOutlined />, route: '/qa', tone: 'ai' },
   { label: '查看学习画像', icon: <UserOutlined />, route: '/profile', tone: 'primary' },
+  { label: '打开全局 Agent', icon: <RobotOutlined />, route: '/agent', tone: 'agent' },
 ]
 
 const Dashboard: React.FC = () => {
@@ -75,7 +76,6 @@ const Dashboard: React.FC = () => {
 
     <section className="dashboard-shortcuts" aria-label="快捷学习工具">
       {shortcuts.map((shortcut) => <button type="button" className="dashboard-shortcut" key={shortcut.label} onClick={() => navigate(shortcut.route)}><span className={`dashboard-shortcut-icon is-${shortcut.tone}`}>{shortcut.icon}</span><span>{shortcut.label}</span></button>)}
-      <button type="button" className="dashboard-shortcut" onClick={() => void loadOverview()}><span className="dashboard-shortcut-icon is-primary"><ReloadOutlined /></span><span>刷新学习状态</span></button>
     </section>
 
     <section className="dashboard-core-grid">

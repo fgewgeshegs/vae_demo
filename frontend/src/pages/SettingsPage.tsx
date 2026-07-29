@@ -8,6 +8,7 @@ import {
 } from "@ant-design/icons"
 import { configApi } from "../services/api"
 import type { SystemConfig } from "../types"
+import WorkspacePageHeader from "../components/WorkspacePageHeader"
 
 const { Title, Text } = Typography
 
@@ -138,7 +139,7 @@ const SettingsPage: React.FC = () => {
 
   return (
     <div className="workspace-page workspace-page--settings">
-      <Title level={4}>系统设置</Title>
+      <WorkspacePageHeader title="系统设置" description="管理平台运行配置；敏感密钥始终以掩码方式展示。" metrics={[{ label: '配置项', value: configs.length }]} />
 
       <div className="card" style={{ padding: "16px 20px", marginBottom: 16, display: "flex", alignItems: "center", gap: 10 }}>
         <SafetyOutlined style={{ color: "#10b981" }} />

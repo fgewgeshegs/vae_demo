@@ -147,6 +147,7 @@ export interface QARecord {
   course_id: number | null
   question: string
   answer: string | null
+  conversation_id: string | null
   resource_ids: number[]
   metadata: Record<string, unknown> | null
   created_at: string

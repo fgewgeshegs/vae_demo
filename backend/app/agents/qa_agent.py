@@ -83,6 +83,8 @@ class QAAgent:
         user_id = state["user_id"]
         course_id = state.get("course_id")
         message = state["message"]
+        mode = state.get("mode", "expert")
+        history = state.get("history", [])
 
         # --- Content-safety guard: reject explicit harmful prompts ---
         prompt_guard = ContentGuard.check_prompt(message)
@@ -97,7 +99,7 @@ class QAAgent:
                 "guard_decision": GuardDecision.REJECT.value,
             }
 
-        results = await self.retriever.retrieve(
+        results = [] if mode == "quick" else await self.retriever.retrieve(
             query=message,
             course_id=course_id,
             limit=5,
@@ -107,7 +109,7 @@ class QAAgent:
         has_context = len(results) > 0
         profile_summary = await self._profile_summary(user_id, course_id)
         context = self._context(results)
-        system_prompt = f"""你是《人工智能导论》课程助教。请使用课程资料回答学生问题。
+        system_prompt = f"""你是《人工智能导论》课程助教。{'请直接使用通用知识清晰回答，不要声称引用了课程资料。' if mode == 'quick' else '请使用课程资料回答学生问题。'}
 
 回答要求：
 1. 开头直接回答问题，不要先讨论资料是否给出了正式定义。
@@ -125,7 +127,7 @@ class QAAgent:
 """
         try:
             response = await self.llm.chat(
-                messages=[LLMMessage("user", message)],
+                messages=[*history, LLMMessage("user", message)],
                 system_prompt=system_prompt,
                 temperature=0.3,
                 max_tokens=2048,
@@ -156,7 +158,7 @@ class QAAgent:
             "type": "qa_answer",
             "answer": answer,
             "provider": provider,
-            "retrieval_method": "bge_m3_pgvector_bge_reranker",
+            "retrieval_method": "none" if mode == "quick" else "bge_m3_pgvector_bge_reranker",
             "sources": [
                 {
                     "source": item.get("source", ""),

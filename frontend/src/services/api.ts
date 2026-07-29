@@ -142,8 +142,8 @@ export const studyPathApi = {
 // ========== 问答 API ==========
 export const qaApi = {
   list: (courseId?: number) => api.get<QARecord[]>("/qa/", { params: { course_id: courseId } }),
-  ask: (question: string, courseId?: number) =>
-    api.post<QARecord>("/qa/ask", { question, course_id: courseId }),
+  ask: (question: string, courseId?: number, metadata: Record<string, unknown> = {}, conversationId?: string) =>
+    api.post<QARecord>("/qa/ask", { question, course_id: courseId, metadata, conversation_id: conversationId }),
   get: (id: number) => api.get<QARecord>(`/qa/${id}`),
   count: () => api.get<{ count: number }>("/qa/count"),
 }

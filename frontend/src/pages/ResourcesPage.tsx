@@ -6,6 +6,7 @@ import ResourceModal from '../components/ResourceModal'
 import { resourceApi } from '../services/api'
 import { useTaskRunner } from '../hooks/useTaskRunner'
 import type { LearningResource } from '../types'
+import WorkspacePageHeader from '../components/WorkspacePageHeader'
 
 const { Paragraph, Title, Text } = Typography
 
@@ -87,7 +88,7 @@ const ResourcesPage: React.FC = () => {
 
   return (
     <div className="workspace-page workspace-page--resources">
-      <Title level={4}>资源中心</Title>
+      <WorkspacePageHeader title="资源中心" description="集中管理学习资料，并由 Agent 按需生成新的内容。" metrics={[{ label: '当前资源', value: loading ? '加载中' : resources.length }]} />
       <Card style={{ marginBottom: 16 }} title={<Space><RobotOutlined />资源生成 Agent</Space>}>
         <Space.Compact style={{ width: '100%' }}>
           <Input

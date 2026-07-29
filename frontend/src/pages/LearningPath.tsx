@@ -33,6 +33,7 @@ import type { VideoTask } from '../services/api'
 import { useTaskRunner } from '../hooks/useTaskRunner'
 import ResourceModal from '../components/ResourceModal'
 import type { ChapterPlan, ChapterTask, LearningResource, StudyPath, StudyPathNode, TaskProgress as TaskProgressData } from '../types'
+import WorkspacePageHeader from '../components/WorkspacePageHeader'
 import ReactMarkdown from 'react-markdown'
 import remarkGfm from 'remark-gfm'
 const { Title, Text, Paragraph } = Typography
@@ -144,6 +145,8 @@ const LearningPath: React.FC = () => {
   // ---- chapter plan state ----
   const [chapterPlan, setChapterPlan] = useState<ChapterPlan | null>(null)
   const [currentTaskIndex, setCurrentTaskIndex] = useState(0)
+  const [learningMode, setLearningMode] = useState(false)
+  const [planCollapsed, setPlanCollapsed] = useState(false)
   const [taskProgress, setTaskProgress] = useState<Map<string, TaskProgressData>>(new Map())
   const [planLoading, setPlanLoading] = useState(false)
   // ---- resource detail modal ----
@@ -245,6 +248,8 @@ const LearningPath: React.FC = () => {
   // clear chapter plan and exercise selection when switching nodes
   useEffect(() => {
     setChapterPlan(null)
+    setLearningMode(false)
+    setPlanCollapsed(false)
     setExerciseAnswers({})
   }, [selectedNode?.id])
 
@@ -334,6 +339,15 @@ const LearningPath: React.FC = () => {
   }
   const backToNodes = () => {
     setChapterPlan(null)
+    setLearningMode(false)
+    setPlanCollapsed(false)
+  }
+
+  const startLearning = async () => {
+    if (!selectedNode) return
+    setLearningMode(true)
+    setPlanCollapsed(true)
+    if (selectedNode.chapter_id && !chapterPlan) await loadChapterPlan()
   }
 
   const handleGenerateOrPlayVideo = async (resource: LearningResource) => {
@@ -425,15 +439,9 @@ const LearningPath: React.FC = () => {
 
   return (
     <div className="workspace-page workspace-page--learning-path">
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 16 }}>
-        <Title level={4} style={{ margin: 0 }}>
-          <BookOutlined style={{ marginRight: 8 }} />
-          学习路径
-        </Title>
-        <Button type="primary" icon={<RobotOutlined />} loading={running} onClick={generate}>
+      <WorkspacePageHeader title="学习路径" description="按当前课程与进度组织学习任务，专注完成下一项可执行任务。" metrics={[{ label: '路径进度', value: activePath ? `${Math.round((activePath.progress || 0) * 100)}%` : '未生成' }, { label: '任务节点', value: nodes.length }]} actions={<Button type="primary" icon={<RobotOutlined />} loading={running} onClick={generate}>
           {running ? 'Agent 正在执行...' : activePath ? '重新规划路径' : '生成学习路径'}
-        </Button>
-      </div>
+        </Button>} />
       <TaskProgress task={activeTask} onClose={clearTask} />
 
       {!activePath ? (
@@ -441,8 +449,8 @@ const LearningPath: React.FC = () => {
       ) : (
         <Row gutter={[16, 16]} style={{ marginTop: 16 }}>
           {/* ===== Left Panel ===== */}
-          <Col xs={24} lg={9}>
-            <Card>
+          {(!learningMode || !planCollapsed) && <Col xs={24} lg={learningMode ? 9 : 24}>
+            <Card className={learningMode ? 'learning-plan-panel' : 'learning-plan-panel learning-plan-panel--overview'}>
               {chapterPlan ? (
                 <PlanTaskFlow
                   chapterPlan={chapterPlan}
@@ -496,7 +504,7 @@ const LearningPath: React.FC = () => {
                         items={group.nodes.map((node) => ({
                           color: node.status === 'completed' ? 'green' : selectedNode?.id === node.id ? 'blue' : node.type === 'preview' ? 'orange' : 'gray',
                           children: (
-                            <button type="button" onClick={() => setSelectedNodeId(node.id)}
+                            <div role="button" tabIndex={0} className={`learning-plan-node ${selectedNode?.id === node.id ? 'is-selected' : ''}`} onClick={() => setSelectedNodeId(node.id)}
                               style={{
                                 width: '100%', border: 0,
                                 background: selectedNode?.id === node.id ? 'rgba(65, 105, 225, 0.10)' : 'transparent',
@@ -513,8 +521,13 @@ const LearningPath: React.FC = () => {
                                   </Tag>
                                   <Text type="secondary" style={{ fontSize: 12 }}>{node.estimated_minutes} 分钟</Text>
                                 </Space>
+                                {selectedNode?.id === node.id && node.status !== 'completed' && (
+                                  <Button type="primary" size="small" className="learning-plan-start-button" onClick={(event) => { event.stopPropagation(); void startLearning() }}>
+                                    {node.status === 'in_progress' ? '继续学习' : '开始学习'}
+                                  </Button>
+                                )}
                               </Space>
-                            </button>
+                            </div>
                           ),
                         }))}
                       />
@@ -523,10 +536,14 @@ const LearningPath: React.FC = () => {
                 </Space>
               )}
             </Card>
-          </Col>
+          </Col>}
           {/* ===== Right Panel ===== */}
-          <Col xs={24} lg={15}>
+          {learningMode && <Col xs={24} lg={planCollapsed ? 24 : 15}>
             <Card>
+              <div className="learning-plan-study-toolbar">
+                <Button type="link" className="learning-plan-back" onClick={() => setLearningMode(false)}>← 返回学习计划</Button>
+                <Button size="small" onClick={() => setPlanCollapsed((value) => !value)}>{planCollapsed ? '显示目录' : '收起目录'}</Button>
+              </div>
               {chapterPlan && currentTask ? (
                 <PlanTaskDetail
                   task={currentTask}
@@ -798,7 +815,7 @@ const LearningPath: React.FC = () => {
                 <Empty description="请选择一个学习节点" />
               )}
             </Card>
-          </Col>
+          </Col>}
         </Row>
       )}
       <ResourceModal

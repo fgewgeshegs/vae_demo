@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from uuid import uuid4
+
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -41,12 +43,57 @@ async def ask_question(
     current_user: User = Depends(get_current_user),
 ):
     """提问并获取回答（使用 QAAgent 进行画像感知的回答）"""
+    conversation_id = data.conversation_id or str(uuid4())
+    history: list[dict[str, str]] = []
+    if data.conversation_id:
+        if data.conversation_id.startswith("legacy-"):
+            try:
+                legacy_record_id = int(data.conversation_id.removeprefix("legacy-"))
+            except ValueError as exc:
+                raise HTTPException(status_code=404, detail="会话不存在") from exc
+            legacy_result = await db.execute(
+                select(QARecord).where(
+                    QARecord.id == legacy_record_id,
+                    QARecord.user_id == current_user.id,
+                    QARecord.conversation_id.is_(None),
+                )
+            )
+            legacy_record = legacy_result.scalar_one_or_none()
+            if not legacy_record:
+                raise HTTPException(status_code=404, detail="会话不存在")
+            conversation_id = str(uuid4())
+            legacy_record.conversation_id = conversation_id
+            previous_records = [legacy_record]
+        else:
+            history_result = await db.execute(
+                select(QARecord)
+                .where(
+                    QARecord.user_id == current_user.id,
+                    QARecord.conversation_id == data.conversation_id,
+                )
+                .order_by(QARecord.created_at.desc())
+                .limit(8)
+            )
+            previous_records = list(reversed(history_result.scalars().all()))
+        if not previous_records:
+            raise HTTPException(status_code=404, detail="会话不存在")
+        history = [
+            message
+            for record in previous_records
+            for message in (
+                {"role": "user", "content": record.question},
+                *([{ "role": "assistant", "content": record.answer }] if record.answer else []),
+            )
+        ]
+
     # 使用 QAAgent 获取画像感知的回答
     qa_agent = QAAgent()
     agent_result = await qa_agent.process({
         "user_id": current_user.id,
         "course_id": data.course_id,
         "message": data.question,
+        "mode": (data.metadata or {}).get("mode", "expert"),
+        "history": history,
     })
 
     answer = agent_result.get("answer", "")
@@ -64,6 +111,7 @@ async def ask_question(
         course_id=data.course_id,
         question=data.question,
         answer=answer,
+        conversation_id=conversation_id,
         qa_metadata=qa_metadata,
     )
     db.add(record)

@@ -4,6 +4,7 @@ import { SendOutlined, ThunderboltOutlined, UserOutlined, RobotOutlined } from '
 import { chatApi } from '../services/api'
 import ReactMarkdown from 'react-markdown'
 import remarkGfm from 'remark-gfm'
+import WorkspacePageHeader from '../components/WorkspacePageHeader'
 
 const { Text } = Typography
 const { TextArea } = Input
@@ -319,6 +320,7 @@ const AgentPage: React.FC = () => {
 
   return (
     <div className="workspace-page workspace-page--agent" style={{ display: 'flex', flexDirection: 'column', height: 'calc(100vh - 150px)' }}>
+      <WorkspacePageHeader title="全局 Agent" description="统一协调知识库、学习画像、路径、资源与评估任务。" metrics={[{ label: '会话消息', value: conversation.length }]} />
       <div style={{ marginBottom: 16 }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
           <ThunderboltOutlined style={{ fontSize: 20, color: '#7c5bd6' }} />
