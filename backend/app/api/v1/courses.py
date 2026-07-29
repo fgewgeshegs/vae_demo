@@ -8,7 +8,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
 from app.core.database import get_db
-from app.core.security import get_current_user
+from app.core.security import get_current_user, require_admin
 from app.models.user import User
 from app.models.course import Course, Chapter
 from app.schemas.course import CourseCreate, CourseResponse, ChapterResponse
@@ -54,7 +54,7 @@ async def get_course(
 async def create_course(
     data: CourseCreate,
     db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(require_admin),
 ):
     """创建课程"""
     course = Course(**data.model_dump())
@@ -74,7 +74,7 @@ async def create_course(
 async def delete_course(
     course_id: int,
     db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(require_admin),
 ):
     """删除课程"""
     result = await db.execute(select(Course).where(Course.id == course_id))

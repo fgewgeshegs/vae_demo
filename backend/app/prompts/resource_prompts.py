@@ -51,12 +51,18 @@ READING_GENERATION_PROMPT = """你是一个学术阅读导师。请根据以下�
 3. 说明与当前学习内容的关联
 4. 标注阅读优先级和预计阅读时间"""
 
-VIDEO_GENERATION_PROMPT = """你是一个教学动画脚本作者。请根据以下知识点生成教学动画脚本：
+VIDEO_GENERATION_PROMPT = """请根据以下知识点生成仿视频微课播放器可用的微课分镜数据：
 知识点：{knowledge_point}
-脚本格式：{format}
+输出格式：{format}
 
 要求：
-1. 包含场景描述和旁白文本
-2. 适合生成教学动画
-3. 时长控制在 3-5 分钟
-4. 包含关键概念的可视化说明"""
+1. 只输出严格 JSON 对象，不要输出 Markdown、代码块或普通脚本文字
+2. JSON 必须包含 mode、title、duration_seconds、slides
+3. mode 固定为 video_like_slides
+4. slides 为 6-8 页，每页包含 start、end、title、bullets、caption、teacher_script、examples、interaction_question、visual
+5. bullets 是屏幕要点，每页至少 4 条，必须包含具体事实、解释、例子、易错点或小结
+6. caption 是字幕式讲解文案，60-100 字，不要只写一句标题
+7. teacher_script 是教师讲解稿，120-180 字，要像课堂讲解
+8. examples 至少 2 条，优先使用教材案例或贴近学生的应用场景
+9. visual.type 可用 concept、timeline、flow、compare、quote、quiz，visual.keywords 至少 4 个且必须清晰可读
+10. 时长控制在 3-5 分钟，start/end 连续递增"""

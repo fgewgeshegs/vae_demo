@@ -3,8 +3,8 @@
 层次	技术选型	运行方式
 基础设施	PostgreSQL 17 + pgvector + Redis 8	Docker Compose
 后端	Python FastAPI + SQLAlchemy 2.0 async	宿主机 uvicorn 热更新
-前端	React 19 + TypeScript + Vite + Ant Design 5 + Zustand	宿主机 npm run dev
-多智能体	LangGraph	宿主机 Python
+前端	React 18 + TypeScript + Vite + Ant Design 5 + Zustand	宿主机 npm run dev
+多智能体	自定义协调器（LLM 工具调用，非 LangGraph）	宿主机 Python
 LLM 接入	多供应商抽象层（DeepSeek/GLM/Qwen/OpenAI）+ Mock 模式	宿主机 Python
 向量检索	pgvector (PostgreSQL 内置)	Docker 内
 文件存储	本地 uploads/ 目录	宿主机
@@ -16,7 +16,7 @@ LLM 接入	多供应商抽象层（DeepSeek/GLM/Qwen/OpenAI）+ Mock 模式	宿�
 步骤4: npm run dev                   # 启动前端（宿主机，或 npm run build 后由后端 serve）
 Docker 只在第一步出现，一旦数据库跑起来，你后续开发完全不感知 Docker 存在。代码改了，uvicorn --reload 自动重启后端，Vite 自动热更新前端，开发体验丝滑。
 三、多智能体协作框架
-用户对话 → 前端 SSE → FastAPI → Coordinator（LangGraph 状态图）
+用户对话 → 前端 SSE → FastAPI → Coordinator（自定义 LLM 工具调用协调器）
                                   │
                     ┌─────────────┴─────────────┐
                     │    意图识别 + 任务分派       │
@@ -109,7 +109,7 @@ ai-learning-platform/
 │   │   ├── models/             # 12张表 SQLAlchemy models
 │   │   ├── schemas/            # Pydantic
 │   │   ├── api/v1/             # 10个路由模块
-│   │   ├── agents/             # LangGraph 智能体
+│   │   ├── agents/             # 自定义协调智能体（LLM 工具调用）
 │   │   │   ├── coordinator.py  # 协调器（意图路由）
 │   │   │   ├── profile_agent.py
 │   │   │   ├── resource_agent/ # 6个子Agent
@@ -151,8 +151,8 @@ Phase 6	UI打磨 + 种子课程知识库填充 + 演示数据 + Docker评审 + �
 ● 数据库：PostgreSQL 17 + pgvector，Docker 运行
 ● 缓存：Redis 8，Docker 运行
 ● 后端：FastAPI + SQLAlchemy 2.0 async，宿主机 uvicorn --reload
-● 前端：React 19 + TypeScript + Vite + Ant Design 5 + Zustand，宿主机 npm run dev
-● 多智能体框架：LangGraph
+● 前端：React 18 + TypeScript + Vite + Ant Design 5 + Zustand，宿主机 npm run dev
+● 多智能体框架：自定义协调器（LLM 工具调用，非 LangGraph）
 ● LLM：多供应商抽象层（DeepSeek/GLM/Qwen/OpenAI）+ Mock 模式优先开发
 ● 种子课程：《人工智能导论》，支持上传1-N本教材 PDF
 ● 画像构建：纯对话自动抽取，用户不可手动编辑

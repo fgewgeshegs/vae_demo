@@ -1,158 +1,209 @@
-﻿import React, { useEffect, useState } from 'react'
-import { Card, Form, Input, Select, Button, Typography, Spin, message, Space, Divider } from 'antd'
-import { SettingOutlined, ApiOutlined, SaveOutlined } from '@ant-design/icons'
-import { configApi } from '../services/api'
-import type { SystemConfig } from '../types'
+import React, { useEffect, useState } from "react"
+import {
+  Button, Empty, Input, message, Modal, Select, Spin, Table, Tag, Typography,
+} from "antd"
+import type { ColumnsType } from "antd/es/table"
+import {
+  EditOutlined, KeyOutlined, SafetyOutlined, SettingOutlined,
+} from "@ant-design/icons"
+import { configApi } from "../services/api"
+import type { SystemConfig } from "../types"
 
 const { Title, Text } = Typography
+
+const PROVIDER_OPTIONS = [
+  { value: "mock", label: "Mock（离线开发）" },
+  { value: "deepseek", label: "DeepSeek" },
+  { value: "glm", label: "GLM（智谱）" },
+  { value: "qwen", label: "Qwen（通义千问）" },
+  { value: "openai", label: "OpenAI" },
+]
+
+const isProviderKey = (key: string) => /provider/i.test(key)
+
+interface ApiError {
+  response?: { status?: number; data?: { detail?: string } }
+}
 
 const SettingsPage: React.FC = () => {
   const [configs, setConfigs] = useState<SystemConfig[]>([])
   const [loading, setLoading] = useState(true)
-  const [saving, setSaving] = useState<string | null>(null)
+  const [forbidden, setForbidden] = useState(false)
+  const [editing, setEditing] = useState<SystemConfig | null>(null)
+  const [editValue, setEditValue] = useState("")
+  const [saving, setSaving] = useState(false)
 
-  // 本地编辑状态
-  const [editedValues, setEditedValues] = useState<Record<string, string>>({})
-
-  useEffect(() => {
-    const fetchConfigs = async () => {
-      try {
-        const res = await configApi.list()
-        setConfigs(res.data)
-        // 初始化本地编辑值
-        const values: Record<string, string> = {}
-        res.data.forEach((c) => {
-          values[c.config_key] = c.config_value
-        })
-        setEditedValues(values)
-      } catch {
-        message.error('获取配置失败')
-      } finally {
-        setLoading(false)
-      }
-    }
-    fetchConfigs()
-  }, [])
-
-  const updateValue = (key: string, value: string) => {
-    setEditedValues((prev) => ({ ...prev, [key]: value }))
-  }
-
-  const handleSave = async (configKey: string) => {
-    setSaving(configKey)
+  const load = async () => {
+    setLoading(true)
+    setForbidden(false)
     try {
-      const value = editedValues[configKey] || ''
-      await configApi.update(configKey, { config_key: configKey, config_value: value })
-      message.success(`${configKey} 已更新`)
-    } catch {
-      message.error('更新失败')
+      const res = await configApi.list()
+      setConfigs(res.data)
+    } catch (err: unknown) {
+      if ((err as ApiError).response?.status === 403) {
+        setForbidden(true)
+      } else {
+        message.error("配置加载失败")
+      }
     } finally {
-      setSaving(null)
+      setLoading(false)
     }
   }
 
-  const getConfig = (key: string) => configs.find((c) => c.config_key === key)
+  useEffect(() => { load() }, [])
+
+  const openEdit = (cfg: SystemConfig) => {
+    setEditing(cfg)
+    setEditValue(cfg.is_secret ? "" : cfg.config_value)
+  }
+
+  const save = async () => {
+    if (!editing) return
+    if (editing.is_secret && !editValue.trim()) {
+      message.warning("请输入新的密钥值，或取消编辑")
+      return
+    }
+    setSaving(true)
+    try {
+      await configApi.update(editing.config_key, { config_value: editValue.trim() })
+      message.success("配置已更新（热生效）")
+      setEditing(null)
+      await load()
+    } catch (err: unknown) {
+      const detail = (err as ApiError).response?.data?.detail
+      message.error(detail || "更新失败")
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  const columns: ColumnsType<SystemConfig> = [
+    {
+      title: "配置项",
+      dataIndex: "config_key",
+      key: "config_key",
+      render: (key: string, record) => (
+        <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+          {record.is_secret ? <KeyOutlined style={{ color: "#f59e0b" }} /> : <SettingOutlined style={{ color: "#94a3b8" }} />}
+          <Text strong style={{ fontSize: 13 }}>{key}</Text>
+        </div>
+      ),
+    },
+    {
+      title: "当前值",
+      dataIndex: "config_value",
+      key: "config_value",
+      render: (val: string, record) =>
+        record.is_secret ? (
+          <Tag color="orange" style={{ fontFamily: "var(--font-mono)", fontSize: 12 }}>********</Tag>
+        ) : (
+          <Text style={{ fontFamily: "var(--font-mono)", fontSize: 12, color: "#475569" }}>{val || "—"}</Text>
+        ),
+    },
+    {
+      title: "类型",
+      dataIndex: "config_type",
+      key: "config_type",
+      render: (t: string) => <Tag style={{ fontSize: 11 }}>{t}</Tag>,
+    },
+    {
+      title: "说明",
+      dataIndex: "description",
+      key: "description",
+      render: (d: string) => <Text style={{ fontSize: 12, color: "#64748b" }}>{d || "—"}</Text>,
+    },
+    {
+      title: "操作",
+      key: "action",
+      render: (_: unknown, record) => (
+        <Button size="small" icon={<EditOutlined />} onClick={() => openEdit(record)}>编辑</Button>
+      ),
+    },
+  ]
 
   if (loading) {
+    return <div style={{ textAlign: "center", padding: 80 }}><Spin size="large" /></div>
+  }
+
+  if (forbidden) {
     return (
-      <div style={{ textAlign: 'center', paddingTop: 100 }}>
-        <Spin size="large" />
+      <div>
+        <Title level={4}>系统设置</Title>
+        <Empty description={<span style={{ color: "#94a3b8" }}>需要管理员权限才能查看系统配置</span>}>
+          <Button onClick={load}>重新加载</Button>
+        </Empty>
       </div>
     )
   }
 
   return (
-    <div>
-      <Title level={4}>
-        <SettingOutlined style={{ marginRight: 8 }} />
-        系统设置
-      </Title>
-      <Text type="secondary">配置热生效，无需重启服务</Text>
+    <div className="workspace-page workspace-page--settings">
+      <Title level={4}>系统设置</Title>
 
-      <Card title={<><ApiOutlined /> LLM 供应商配置</>} style={{ marginTop: 16 }}>
-        <Form layout="vertical">
-          <Form.Item label="当前供应商">
-            <Select
-              value={editedValues['llm_provider'] || 'mock'}
-              onChange={(val) => updateValue('llm_provider', val)}
-              options={[
-                { label: 'Mock 模式（开发测试）', value: 'mock' },
-                { label: 'DeepSeek', value: 'deepseek' },
-                { label: 'OpenAI', value: 'openai' },
-                { label: 'GLM (智谱)', value: 'glm' },
-                { label: 'Qwen (通义千问)', value: 'qwen' },
-              ]}
-            />
-            <Button
-              type="primary"
-              size="small"
-              icon={<SaveOutlined />}
-              loading={saving === 'llm_provider'}
-              onClick={() => handleSave('llm_provider')}
-              style={{ marginTop: 8 }}
-            >
-              保存
-            </Button>
-          </Form.Item>
+      <div className="card" style={{ padding: "16px 20px", marginBottom: 16, display: "flex", alignItems: "center", gap: 10 }}>
+        <SafetyOutlined style={{ color: "#10b981" }} />
+        <Text style={{ fontSize: 12, color: "#64748b" }}>
+          密钥类配置以 ******** 掩码显示，编辑时需输入新值才会保存；后端拒绝保存掩码占位符。
+        </Text>
+      </div>
 
-          <Divider />
+      <div className="card" style={{ padding: 0, overflow: "hidden" }}>
+        <Table
+          dataSource={configs}
+          columns={columns}
+          rowKey="id"
+          pagination={false}
+          locale={{ emptyText: <Empty description="暂无配置项" /> }}
+        />
+      </div>
 
-          {[
-            { key: 'deepseek_api_key', label: 'DeepSeek API Key', placeholder: 'sk-xxx' },
-            { key: 'openai_api_key', label: 'OpenAI API Key', placeholder: 'sk-xxx' },
-            { key: 'glm_api_key', label: 'GLM API Key', placeholder: 'xxx' },
-            { key: 'qwen_api_key', label: 'Qwen API Key', placeholder: 'sk-xxx' },
-          ].map(({ key, label, placeholder }) => (
-            <Form.Item key={key} label={label}>
-              <Space.Compact style={{ width: '100%' }}>
+      <Modal
+        title={editing ? `编辑：${editing.config_key}` : ""}
+        open={!!editing}
+        onCancel={() => setEditing(null)}
+        onOk={save}
+        confirmLoading={saving}
+        okText="保存"
+        cancelText="取消"
+      >
+        {editing && (
+          <div style={{ paddingTop: 8 }}>
+            {editing.description && (
+              <Text style={{ display: "block", fontSize: 12, color: "#94a3b8", marginBottom: 12 }}>
+                {editing.description}
+              </Text>
+            )}
+            {editing.is_secret ? (
+              <>
                 <Input.Password
-                  placeholder={placeholder}
-                  value={editedValues[key] || ''}
-                  onChange={(e) => updateValue(key, e.target.value)}
-                  style={{ flex: 1 }}
+                  value={editValue}
+                  onChange={(e) => setEditValue(e.target.value)}
+                  placeholder="输入新的密钥值（不会显示原值）"
+                  prefix={<KeyOutlined style={{ color: "#f59e0b" }} />}
                 />
-                <Button
-                  type="primary"
-                  icon={<SaveOutlined />}
-                  loading={saving === key}
-                  onClick={() => handleSave(key)}
-                >
-                  保存
-                </Button>
-              </Space.Compact>
-            </Form.Item>
-          ))}
-        </Form>
-      </Card>
-
-      <Card title="其他设置" style={{ marginTop: 16 }}>
-        <Form layout="vertical">
-          {[
-            { key: 'llm_mock_delay', label: 'Mock 模式延迟（秒）', type: 'number', step: 0.1, defaultVal: '0.5' },
-            { key: 'jwt_expire_minutes', label: 'JWT 过期时间（分钟）', type: 'number', step: 1, defaultVal: '1440' },
-          ].map(({ key, label, type, step, defaultVal }) => (
-            <Form.Item key={key} label={label}>
-              <Space.Compact style={{ width: '100%' }}>
-                <Input
-                  type={type}
-                  step={step}
-                  value={editedValues[key] ?? defaultVal}
-                  onChange={(e) => updateValue(key, e.target.value)}
-                  style={{ flex: 1 }}
-                />
-                <Button
-                  type="primary"
-                  icon={<SaveOutlined />}
-                  loading={saving === key}
-                  onClick={() => handleSave(key)}
-                >
-                  保存
-                </Button>
-              </Space.Compact>
-            </Form.Item>
-          ))}
-        </Form>
-      </Card>
+                <Text style={{ display: "block", fontSize: 11, color: "#94a3b8", marginTop: 8 }}>
+                  出于安全考虑，原密钥不会回显。输入新值后保存即可热生效。
+                </Text>
+              </>
+            ) : isProviderKey(editing.config_key) ? (
+              <Select
+                value={editValue}
+                onChange={setEditValue}
+                options={PROVIDER_OPTIONS}
+                style={{ width: "100%" }}
+                placeholder="选择 LLM 供应商"
+              />
+            ) : (
+              <Input.TextArea
+                value={editValue}
+                onChange={(e) => setEditValue(e.target.value)}
+                rows={3}
+                placeholder="输入配置值"
+              />
+            )}
+          </div>
+        )}
+      </Modal>
     </div>
   )
 }

@@ -199,3 +199,138 @@ class LearningStrategyEngine:
             "鼓励学习者用自己的话复述知识点。"
         )
         return context
+
+    def apply_chapter_strategies(self, chapter_info: dict, profile: dict) -> Dict[str, Any]:
+        """为整个章节应用学习策略"""
+        context = {}
+        
+        # 根据章节特点推荐策略
+        chapter_strategies = self.get_chapter_strategy_recommendations(chapter_info, profile)
+        
+        # 应用每个策略
+        for strategy in chapter_strategies:
+            context = self.apply(strategy, context)
+        
+        # 添加章节特定的上下文
+        context["chapter_title"] = chapter_info.get("title", "")
+        context["knowledge_point_count"] = len(chapter_info.get("knowledge_points", []))
+        context["total_estimated_minutes"] = chapter_info.get("total_estimated_minutes", 0)
+        
+        return context
+    
+    def get_chapter_strategy_recommendations(self, chapter_info: dict, profile: dict) -> List[LearningStrategy]:
+        """根据章节特点推荐学习策略"""
+        recommendations = []
+        
+        # 基础策略：间隔重复
+        recommendations.append(LearningStrategy.SPACED_REPETITION)
+        
+        # 根据章节内容特点推荐策略
+        knowledge_points = chapter_info.get("knowledge_points", [])
+        has_complex_concepts = any(
+            kp.get("difficulty") in ("hard", "困难") 
+            for kp in knowledge_points
+        )
+        has_practical_content = any(
+            "实践" in kp.get("title", "") or "案例" in kp.get("title", "")
+            for kp in knowledge_points
+        )
+        
+        # 复杂概念：推荐费曼学习法和主动回忆
+        if has_complex_concepts:
+            if LearningStrategy.FEYNMAN_TECHNIQUE not in recommendations:
+                recommendations.append(LearningStrategy.FEYNMAN_TECHNIQUE)
+            if LearningStrategy.ACTIVE_RECALL not in recommendations:
+                recommendations.append(LearningStrategy.ACTIVE_RECALL)
+        
+        # 实践内容：推荐交错练习
+        if has_practical_content:
+            if LearningStrategy.INTERLEAVING not in recommendations:
+                recommendations.append(LearningStrategy.INTERLEAVING)
+        
+        # 根据学生画像推荐策略
+        cognitive_style = profile.get("cognitive_style", {})
+        preference = cognitive_style.get("preference", "").lower()
+        
+        if "视觉" in preference or "visual" in preference:
+            if LearningStrategy.DUAL_CODING not in recommendations:
+                recommendations.append(LearningStrategy.DUAL_CODING)
+        
+        if "逻辑" in preference or "logical" in preference:
+            if LearningStrategy.ELABORATION not in recommendations:
+                recommendations.append(LearningStrategy.ELABORATION)
+        
+        # 根据学生水平推荐策略
+        level = profile.get("knowledge_base", {}).get("level", "beginner")
+        if level in ("beginner", "入门"):
+            if LearningStrategy.FEYNMAN_TECHNIQUE not in recommendations:
+                recommendations.append(LearningStrategy.FEYNMAN_TECHNIQUE)
+        elif level in ("advanced", "高级"):
+            if LearningStrategy.ELABORATION not in recommendations:
+                recommendations.append(LearningStrategy.ELABORATION)
+            if LearningStrategy.INTERLEAVING not in recommendations:
+                recommendations.append(LearningStrategy.INTERLEAVING)
+        
+        # 最多推荐4个策略
+        return recommendations[:4]
+    
+    def build_chapter_strategy_prompt(self, strategies: List[LearningStrategy], context: Dict[str, Any]) -> str:
+        """为章节构建策略提示词"""
+        if not strategies:
+            return ""
+        
+        chapter_title = context.get("chapter_title", "")
+        knowledge_point_count = context.get("knowledge_point_count", 0)
+        
+        parts = [f"【章节学习策略】针对章节《{chapter_title}》（包含 {knowledge_point_count} 个知识点），请应用以下学习策略："]
+        
+        # 添加策略描述
+        for strategy in strategies:
+            strategy_info = self.apply(strategy, {})
+            strategy_name = strategy_info.get("strategy_name", "")
+            strategy_description = strategy_info.get("strategy_description", "")
+            prompt_instructions = strategy_info.get("prompt_instructions", "")
+            
+            if strategy_name:
+                parts.append(f"- {strategy_name}：{strategy_description}")
+                if prompt_instructions:
+                    parts.append(f"  具体要求：{prompt_instructions}")
+        
+        # 添加章节特定的策略应用建议
+        if knowledge_point_count > 5:
+            parts.append("- 章节内容较多，建议将知识点分组学习，每组学习后安排复习")
+        
+        if context.get("total_estimated_minutes", 0) > 120:
+            parts.append("- 章节学习时间较长，建议适当安排休息和复习节点")
+        
+        return "\n".join(parts)
+    
+    def get_learning_phase_strategies(self, phase: str, profile: dict) -> List[LearningStrategy]:
+        """根据学习阶段推荐策略"""
+        phase_strategies = {
+            "preview": [LearningStrategy.DUAL_CODING],  # 预览阶段：双重编码
+            "learn": [LearningStrategy.FEYNMAN_TECHNIQUE, LearningStrategy.ELABORATION],  # 学习阶段：费曼学习法+精细加工
+            "practice": [LearningStrategy.INTERLEAVING, LearningStrategy.ACTIVE_RECALL],  # 练习阶段：交错练习+主动回忆
+            "review": [LearningStrategy.SPACED_REPETITION, LearningStrategy.ACTIVE_RECALL],  # 复习阶段：间隔重复+主动回忆
+            "exam": [LearningStrategy.ACTIVE_RECALL],  # 测试阶段：主动回忆
+        }
+        
+        base_strategies = phase_strategies.get(phase, [])
+        
+        # 根据学生画像调整
+        cognitive_style = profile.get("cognitive_style", {})
+        preference = cognitive_style.get("preference", "").lower()
+        
+        adjusted_strategies = list(base_strategies)
+        
+        # 视觉学习者：在所有阶段增加双重编码
+        if "视觉" in preference or "visual" in preference:
+            if LearningStrategy.DUAL_CODING not in adjusted_strategies:
+                adjusted_strategies.append(LearningStrategy.DUAL_CODING)
+        
+        # 实践学习者：在练习阶段增加交错练习
+        if "实践" in preference or "practical" in preference:
+            if phase == "practice" and LearningStrategy.INTERLEAVING not in adjusted_strategies:
+                adjusted_strategies.append(LearningStrategy.INTERLEAVING)
+        
+        return adjusted_strategies[:3]  # 最多3个策略

@@ -16,8 +16,8 @@ const encouragements = [
 ]
 
 const moods = [
-  '#06b6d4', '#6366f1', '#8b5cf6',
-  '#ec4899', '#34d399', '#f59e0b',
+  '#3b82f6', '#2563eb', '#2563eb',
+  '#2563eb', '#34d399', '#f59e0b',
 ]
 
 const AICompanion: React.FC = () => {
@@ -52,7 +52,7 @@ const AICompanion: React.FC = () => {
       }}>
         <div style={{
           width: '100%', height: '100%', borderRadius: '50%',
-          background: 'radial-gradient(circle at 35% 30%, ' + mood + ', #6366f1)',
+          background: 'radial-gradient(circle at 35% 30%, ' + mood + ', #2563eb)',
           boxShadow: '0 0 20px ' + mood + '33, 0 0 40px ' + mood + '1a',
           transition: 'all 0.8s ease',
         }} />
@@ -62,13 +62,14 @@ const AICompanion: React.FC = () => {
       </div>
       {visible && (
         <div className="animate-thought-appear" style={{
-          background: 'rgba(255,255,255,0.04)',
-          border: '1px solid rgba(255,255,255,0.06)',
+          background: 'rgba(255,255,255,0.72)',
+          border: '1px solid rgba(72,102,153,0.14)',
           borderRadius: '4px 14px 14px 14px',
           padding: '8px 14px',
           maxWidth: 220,
+          boxShadow: '0 10px 24px rgba(42,68,112,0.08)',
         }}>
-          <span style={{ fontSize: 12, color: 'rgba(255,255,255,0.55)', lineHeight: 1.5 }}>
+          <span style={{ fontSize: 12, color: 'var(--text-secondary)', lineHeight: 1.5 }}>
             {message}
           </span>
         </div>

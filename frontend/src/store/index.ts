@@ -11,10 +11,21 @@ interface AuthState {
   loadFromStorage: () => void
 }
 
+const storedAuth = (() => {
+  const token = localStorage.getItem('token')
+  const userStr = localStorage.getItem('user')
+  if (!token || !userStr) return { token: null, user: null, isLoggedIn: false }
+  try {
+    return { token, user: JSON.parse(userStr) as User, isLoggedIn: true }
+  } catch {
+    localStorage.removeItem('token')
+    localStorage.removeItem('user')
+    return { token: null, user: null, isLoggedIn: false }
+  }
+})()
+
 export const useAuthStore = create<AuthState>((set) => ({
-  token: null,
-  user: null,
-  isLoggedIn: false,
+  ...storedAuth,
 
   setAuth: (token, user) => {
     localStorage.setItem('token', token)

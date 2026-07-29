@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import secrets
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy import select, or_
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -15,6 +16,10 @@ from app.core.security import (
 )
 from app.models.user import User
 from app.schemas.user import UserCreate, UserLogin, UserResponse, TokenResponse
+from app.schemas.user import ForgotPasswordRequest, ResetPasswordRequest, ForgotPasswordResponse
+from app.core.config import settings
+from app.services.redis_client import get_redis
+from app.services.email_service import send_reset_code
 
 router = APIRouter()
 
@@ -39,6 +44,7 @@ async def register(data: UserCreate, db: AsyncSession = Depends(get_db)):
         email=data.email,
         hashed_password=get_password_hash(data.password),
         display_name=data.display_name or data.username,
+        is_admin=data.username.lower() in settings.admin_usernames,
     )
     db.add(user)
     await db.flush()
@@ -57,6 +63,7 @@ async def register(data: UserCreate, db: AsyncSession = Depends(get_db)):
             "learning_pace": {"speed": "normal", "preferred_session_minutes": 30},
             "interest_direction": {"areas": []},
             "weak_points": [],
+            "_meta": {"evidence": [], "last_analysis": {}},
         },
     )
     db.add(profile)
@@ -103,3 +110,61 @@ async def login(data: UserLogin, db: AsyncSession = Depends(get_db)):
 async def get_me(current_user: User = Depends(get_current_user)):
     """获取当前用户信息"""
     return UserResponse.model_validate(current_user)
+
+@router.post("/forgot-password", response_model=ForgotPasswordResponse)
+async def forgot_password(data: ForgotPasswordRequest, db: AsyncSession = Depends(get_db)):
+    """发送密码重置验证码"""
+    message = "如果该邮箱已注册，验证码已发送至您的邮箱"
+
+    # 查找用户（不暴露邮箱是否存在）
+    result = await db.execute(select(User).where(User.email == data.email))
+    user = result.scalar_one_or_none()
+    if not user:
+        return ForgotPasswordResponse(message=message)
+
+    # 生成 6 位验证码和重置 token
+    code = "".join(secrets.choice("0123456789") for _ in range(6))
+    token = secrets.token_urlsafe(32)
+
+    redis = get_redis()
+    await redis.set(
+        f"pwd_reset:{data.email}",
+        '{"code":"' + code + '","token":"' + token + '"}',
+        ex=900,
+    )
+
+    # 发送验证码邮件（或记录到日志）
+    send_ok = send_reset_code(data.email, code)
+
+    if settings.DEBUG and send_ok:
+        return ForgotPasswordResponse(message=message, dev_code=code, dev_token=token)
+
+    return ForgotPasswordResponse(message=message)
+
+
+@router.post("/reset-password")
+async def reset_password(data: ResetPasswordRequest, db: AsyncSession = Depends(get_db)):
+    """验证验证码并重置密码"""
+    redis = get_redis()
+    stored = await redis.get(f"pwd_reset:{data.email}")
+    if not stored:
+        raise HTTPException(status_code=400, detail="验证码已过期或未请求重置")
+
+    import json
+    payload = json.loads(stored)
+
+    if payload.get("code") != data.code:
+        raise HTTPException(status_code=400, detail="验证码错误")
+
+    result = await db.execute(select(User).where(User.email == data.email))
+    user = result.scalar_one_or_none()
+    if not user:
+        raise HTTPException(status_code=404, detail="用户不存在")
+
+    user.hashed_password = get_password_hash(data.new_password)
+    await db.flush()
+    await db.commit()
+
+    await redis.delete(f"pwd_reset:{data.email}")
+
+    return {"message": "密码重置成功"}

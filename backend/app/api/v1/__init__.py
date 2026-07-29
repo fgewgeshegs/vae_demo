@@ -1,8 +1,9 @@
-﻿from fastapi import APIRouter
+from fastapi import APIRouter
 
-from app.api.v1 import auth, users, courses, chapters, knowledge_points, documents, resources, study_paths, qa, evaluations, system_configs, search, behaviors, chat
+from app.api.v1 import auth, users, courses, chapters, knowledge_points, documents, resources, study_paths, qa, evaluations, system_configs, search, behaviors, chat, tasks, videos, profile_conversation, chapter_plans, dashboard
 
 v1_router = APIRouter(prefix="/api/v1")
+v1_router.include_router(dashboard.router, prefix="/dashboard", tags=["Dashboard"])
 
 v1_router.include_router(auth.router, prefix="/auth", tags=["认证"])
 v1_router.include_router(users.router, prefix="/users", tags=["用户"])
@@ -18,3 +19,7 @@ v1_router.include_router(system_configs.router, prefix="/settings", tags=["系�
 v1_router.include_router(search.router, prefix="/search", tags=["知识检索"])
 v1_router.include_router(behaviors.router, prefix="/behaviors", tags=["学习行为"])
 v1_router.include_router(chat.router, prefix="/chat", tags=["对话Agent"])
+v1_router.include_router(tasks.router, prefix="/tasks", tags=["学习任务"])
+v1_router.include_router(videos.router, prefix="", tags=["视频生成"])
+v1_router.include_router(profile_conversation.router, prefix="/profile-conversation", tags=["画像构建"])
+v1_router.include_router(chapter_plans.router, prefix="/chapter-plans", tags=["章节学习计划"])

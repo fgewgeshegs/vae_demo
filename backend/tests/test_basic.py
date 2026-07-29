@@ -18,7 +18,7 @@ async def test_imports():
 
     from app.services.embedder import Embedder
     embedder = Embedder()
-    assert embedder.dimension == 1536
+    assert embedder.dimension == 1024
 
     from app.core.llm_gateway import LLMGateway
     gateway = LLMGateway()

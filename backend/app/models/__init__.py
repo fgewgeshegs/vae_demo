@@ -9,6 +9,8 @@ from app.models.qa_record import QARecord
 from app.models.learning_behavior import LearningBehavior
 from app.models.evaluation import Evaluation
 from app.models.system_config import SystemConfig
+from app.models.learning_task import LearningTask
+from app.models.learning_event import LearningEvent
 
 __all__ = [
     "User",
@@ -24,4 +26,6 @@ __all__ = [
     "LearningBehavior",
     "Evaluation",
     "SystemConfig",
+    "LearningTask",
+    "LearningEvent",
 ]

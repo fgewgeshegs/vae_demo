@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from pathlib import Path
 from typing import List
+import asyncio
 
 from loguru import logger
 
@@ -19,20 +20,20 @@ class DocumentParser:
             raise FileNotFoundError(f"文件不存在: {file_path}")
 
         if file_type == "pdf":
-            return await DocumentParser._parse_pdf(path)
+            return await asyncio.to_thread(DocumentParser._parse_pdf, path)
         elif file_type == "docx":
-            return await DocumentParser._parse_docx(path)
+            return await asyncio.to_thread(DocumentParser._parse_docx, path)
         elif file_type == "pptx":
-            return await DocumentParser._parse_pptx(path)
+            return await asyncio.to_thread(DocumentParser._parse_pptx, path)
         elif file_type == "md":
-            return await DocumentParser._parse_md(path)
+            return await asyncio.to_thread(DocumentParser._parse_md, path)
         elif file_type == "txt":
-            return await DocumentParser._parse_txt(path)
+            return await asyncio.to_thread(DocumentParser._parse_txt, path)
         else:
             raise ValueError(f"不支持的文件类型: {file_type}")
 
     @staticmethod
-    async def _parse_pdf(path: Path) -> str:
+    def _parse_pdf(path: Path) -> str:
         """解析 PDF (纯 Python，无需编译)"""
         try:
             from pdfminer.high_level import extract_text
@@ -43,7 +44,7 @@ class DocumentParser:
             return f"[PDF 文件: {path.name}]"
 
     @staticmethod
-    async def _parse_docx(path: Path) -> str:
+    def _parse_docx(path: Path) -> str:
         """解析 DOCX"""
         try:
             from docx import Document
@@ -54,7 +55,7 @@ class DocumentParser:
             return f"[DOCX 文件: {path.name}]"
 
     @staticmethod
-    async def _parse_pptx(path: Path) -> str:
+    def _parse_pptx(path: Path) -> str:
         """解析 PPTX"""
         try:
             from pptx import Presentation
@@ -70,11 +71,11 @@ class DocumentParser:
             return f"[PPTX 文件: {path.name}]"
 
     @staticmethod
-    async def _parse_md(path: Path) -> str:
+    def _parse_md(path: Path) -> str:
         """解析 Markdown"""
         return path.read_text(encoding="utf-8")
 
     @staticmethod
-    async def _parse_txt(path: Path) -> str:
+    def _parse_txt(path: Path) -> str:
         """解析纯文本"""
         return path.read_text(encoding="utf-8")

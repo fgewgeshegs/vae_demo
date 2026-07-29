@@ -1,5 +1,6 @@
 -- 启用 pgvector 扩展
 CREATE EXTENSION IF NOT EXISTS vector;
+CREATE EXTENSION IF NOT EXISTS pg_trgm;
 
 -- 用户认证表
 CREATE TABLE IF NOT EXISTS users (
@@ -8,6 +9,7 @@ CREATE TABLE IF NOT EXISTS users (
     email VARCHAR(255) UNIQUE NOT NULL,
     hashed_password VARCHAR(255) NOT NULL,
     display_name VARCHAR(100),
+    is_admin BOOLEAN NOT NULL DEFAULT FALSE,
     avatar_url VARCHAR(500),
     is_active BOOLEAN DEFAULT TRUE,
     created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
@@ -75,7 +77,7 @@ CREATE TABLE IF NOT EXISTS document_chunks (
     document_id INTEGER NOT NULL REFERENCES documents(id) ON DELETE CASCADE,
     chunk_index INTEGER NOT NULL,
     content TEXT NOT NULL,
-    embedding vector(1536),
+    embedding vector(1024),
     metadata JSONB DEFAULT '{}',
     created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );
@@ -161,6 +163,21 @@ CREATE TABLE IF NOT EXISTS evaluations (
     created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );
 
+-- 学习任务表：按钮和明确学习目标生成的确定性任务
+CREATE TABLE IF NOT EXISTS learning_tasks (
+    id SERIAL PRIMARY KEY,
+    task_type VARCHAR(80) NOT NULL,
+    user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    course_id INTEGER REFERENCES courses(id) ON DELETE CASCADE,
+    status VARCHAR(20) NOT NULL DEFAULT 'running',
+    input JSONB NOT NULL DEFAULT '{}',
+    steps JSONB NOT NULL DEFAULT '[]',
+    result JSONB NOT NULL DEFAULT '{}',
+    error VARCHAR(1000),
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+    updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+);
+
 -- 系统配置表（支持热替换）
 CREATE TABLE IF NOT EXISTS system_configs (
     id SERIAL PRIMARY KEY,
@@ -175,7 +192,9 @@ CREATE TABLE IF NOT EXISTS system_configs (
 );
 
 -- 索引
-CREATE INDEX IF NOT EXISTS idx_document_chunks_embedding ON document_chunks USING ivfflat (embedding vector_cosine_ops) WITH (lists = 100);
+CREATE INDEX IF NOT EXISTS idx_document_chunks_embedding_hnsw ON document_chunks USING hnsw (embedding vector_cosine_ops);
+CREATE INDEX IF NOT EXISTS idx_documents_user_id ON documents(user_id);
+CREATE INDEX IF NOT EXISTS idx_document_chunks_content_trgm ON document_chunks USING gin (content gin_trgm_ops);
 CREATE INDEX IF NOT EXISTS idx_chapters_course_id ON chapters(course_id);
 CREATE INDEX IF NOT EXISTS idx_knowledge_points_chapter_id ON knowledge_points(chapter_id);
 CREATE INDEX IF NOT EXISTS idx_learning_resources_user_id ON learning_resources(user_id);
@@ -184,6 +203,8 @@ CREATE INDEX IF NOT EXISTS idx_learning_behaviors_action_type ON learning_behavi
 CREATE INDEX IF NOT EXISTS idx_qa_records_user_id ON qa_records(user_id);
 CREATE INDEX IF NOT EXISTS idx_evaluations_user_id ON evaluations(user_id);
 CREATE INDEX IF NOT EXISTS idx_study_paths_user_id ON study_paths(user_id);
+CREATE INDEX IF NOT EXISTS idx_learning_tasks_user_id ON learning_tasks(user_id);
+CREATE INDEX IF NOT EXISTS idx_learning_tasks_status ON learning_tasks(status);
 
 -- 插入默认系统配置
 INSERT INTO system_configs (config_key, config_value, config_type, description) VALUES

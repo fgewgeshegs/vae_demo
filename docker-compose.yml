@@ -1,5 +1,3 @@
-version: "3.8"
-
 services:
   postgres:
     image: pgvector/pgvector:pg17
@@ -32,6 +30,74 @@ services:
       interval: 5s
       timeout: 5s
       retries: 5
+
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: ai_learning_backend
+    environment:
+      DATABASE_URL: postgresql+asyncpg://ailearn:ailearn123@postgres:5432/ai_learning
+      REDIS_URL: redis://:redispass@redis:6379/0
+      LLM_PROVIDER: ${LLM_PROVIDER:-mock}
+      BGE_INFERENCE_SERVICE_URL: http://inference:8100
+      CORS_ORIGINS: http://localhost:5173,http://localhost:3000,http://localhost:8080
+    ports:
+      - "8000:8000"
+    volumes:
+      - ../knowledge-base:/knowledge-base:ro
+      - ./backend/uploads:/app/uploads
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      inference:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/health')"]
+      interval: 15s
+      timeout: 10s
+      retries: 10
+      start_period: 90s
+
+  inference:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: ai_learning_inference
+    command: ["python", "-m", "uvicorn", "inference_service.app:app", "--host", "0.0.0.0", "--port", "8100"]
+    environment:
+      BGE_MODEL_PATH: /models/bge-m3
+      BGE_RERANKER_PATH: /models/bge-reranker-v2-m3
+      BGE_DEVICE: ${BGE_DEVICE:-cpu}
+      BGE_INFERENCE_RUNTIME: ${BGE_INFERENCE_RUNTIME:-torch}
+      BGE_DYNAMIC_BATCH_SIZE: ${BGE_DYNAMIC_BATCH_SIZE:-32}
+      BGE_DYNAMIC_BATCH_WAIT_MS: ${BGE_DYNAMIC_BATCH_WAIT_MS:-10}
+      HF_HOME: /models
+      HF_HUB_OFFLINE: "1"
+      TRANSFORMERS_OFFLINE: "1"
+    ports:
+      - "8100:8100"
+    volumes:
+      - ../models:/models:ro
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8100/health')"]
+      interval: 15s
+      timeout: 10s
+      retries: 10
+      start_period: 90s
+
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    container_name: ai_learning_frontend
+    ports:
+      - "8080:80"
+    depends_on:
+      backend:
+        condition: service_healthy
 
 volumes:
   postgres_data:

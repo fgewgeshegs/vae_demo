@@ -4,6 +4,18 @@ import path from 'path'
 
 export default defineConfig({
   plugins: [react()],
+  build: {
+    rollupOptions: {
+      output: {
+        manualChunks: {
+          'vendor-react': ['react', 'react-dom', 'react-router-dom', 'zustand'],
+          'vendor-antd': ['antd', '@ant-design/icons', 'dayjs'],
+          'vendor-charts': ['recharts'],
+          'vendor-http': ['axios'],
+        },
+      },
+    },
+  },
   resolve: {
     alias: {
       '@': path.resolve(__dirname, 'src'),

@@ -1,17 +1,25 @@
-import React, { useEffect } from 'react'
-import { Routes, Route, Navigate } from 'react-router-dom'
-import { useAuthStore } from './store'
-import AppLayout from './components/AppLayout'
-import LoginPage from './pages/LoginPage'
-import Dashboard from './pages/Dashboard'
-import ProfilePage from './pages/ProfilePage'
-import LearningPath from './pages/LearningPath'
-import ResourcesPage from './pages/ResourcesPage'
-import QAPage from './pages/QAPage'
-import EvaluationPage from './pages/EvaluationPage'
-import CourseManagement from './pages/CourseManagement'
-import SearchPage from './pages/SearchPage'
-import SettingsPage from './pages/SettingsPage'
+﻿import React, { lazy, Suspense, useEffect } from "react"
+import { Routes, Route, Navigate } from "react-router-dom"
+import { Spin } from "antd"
+import { useAuthStore } from "./store"
+import AppLayout from "./components/AppLayout"
+
+const LoginPage = lazy(() => import("./pages/LoginPage"))
+const Dashboard = lazy(() => import("./pages/Dashboard"))
+const ProfilePage = lazy(() => import("./pages/ProfilePage"))
+const LearningPath = lazy(() => import("./pages/LearningPath"))
+const ResourcesPage = lazy(() => import("./pages/ResourcesPage"))
+const QAPage = lazy(() => import("./pages/QAPage"))
+const EvaluationPage = lazy(() => import("./pages/EvaluationPage"))
+const AgentPage = lazy(() => import("./pages/AgentPage"))
+const CoursesPage = lazy(() => import("./pages/CoursesPage"))
+const SettingsPage = lazy(() => import("./pages/SettingsPage"))
+
+const PageLoading = () => (
+  <div style={{ minHeight: 240, display: "flex", alignItems: "center", justifyContent: "center" }}>
+    <Spin size="large" tip="页面加载中..." />
+  </div>
+)
 
 const ProtectedRoute: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const isLoggedIn = useAuthStore((s) => s.isLoggedIn)
@@ -27,28 +35,30 @@ const App: React.FC = () => {
   }, [loadFromStorage])
 
   return (
-    <Routes>
-      <Route path="/login" element={<LoginPage />} />
-      <Route
-        path="/"
-        element={
-          <ProtectedRoute>
-            <AppLayout />
-          </ProtectedRoute>
-        }
-      >
-        <Route index element={<Navigate to="/dashboard" replace />} />
-        <Route path="dashboard" element={<Dashboard />} />
-        <Route path="profile" element={<ProfilePage />} />
-        <Route path="path" element={<LearningPath />} />
-        <Route path="resources" element={<ResourcesPage />} />
-        <Route path="qa" element={<QAPage />} />
-        <Route path="evaluation" element={<EvaluationPage />} />
-        <Route path="courses" element={<CourseManagement />} />
-        <Route path="search" element={<SearchPage />} />
-        <Route path="settings" element={<SettingsPage />} />
-      </Route>
-    </Routes>
+    <Suspense fallback={<PageLoading />}>
+      <Routes>
+        <Route path="/login" element={<LoginPage />} />
+        <Route
+          path="/"
+          element={
+            <ProtectedRoute>
+              <AppLayout />
+            </ProtectedRoute>
+          }
+        >
+          <Route index element={<Navigate to="/profile" replace />} />
+          <Route path="dashboard" element={<Dashboard />} />
+          <Route path="profile" element={<ProfilePage />} />
+          <Route path="courses" element={<CoursesPage />} />
+          <Route path="resources" element={<ResourcesPage />} />
+          <Route path="path" element={<LearningPath />} />
+          <Route path="qa" element={<QAPage />} />
+          <Route path="evaluation" element={<EvaluationPage />} />
+          <Route path="agent" element={<AgentPage />} />
+          <Route path="settings" element={<SettingsPage />} />
+        </Route>
+      </Routes>
+    </Suspense>
   )
 }
 

@@ -21,4 +21,9 @@ EVALUATION_PROMPT = """你是学习评估专家。根据以下数据生成评估
         "difficulty_change": "easier|same|harder"
     }}
 }}
+
+注意：
+- score_trend_summary 仅用于判断 improvement，不要直接复制历史综合分或历史维度分。
+- knowledge_mastery、learning_efficiency、engagement、consistency 必须基于本次学习数据重新判断。
+- 只输出 JSON，不要输出解释文字。
 """

@@ -1,182 +1,125 @@
-import React, { useEffect, useState } from "react"
-import { Layout, Menu, Avatar, Dropdown, Typography, Space } from "antd"
-import { Outlet, useNavigate, useLocation } from "react-router-dom"
+import React, { useEffect, useState } from 'react'
+import { Avatar, Breadcrumb, FloatButton, Layout } from 'antd'
+import { Outlet, useLocation, useNavigate } from 'react-router-dom'
 import {
-  DashboardOutlined, UserOutlined, DeploymentUnitOutlined,
-  FileTextOutlined, QuestionCircleOutlined, BarChartOutlined,
-  BookOutlined, SearchOutlined, SettingOutlined, LogoutOutlined,
-  AppstoreOutlined, ReadOutlined, FolderOpenOutlined, SmileOutlined
-} from "@ant-design/icons"
-import { useAuthStore, useUIStore } from "../store"
-import QuickThoughtFAB from "../components/QuickThoughtFAB"
+  ApartmentOutlined, BookOutlined, CheckCircleOutlined, DashboardOutlined,
+  FolderOpenOutlined, MenuFoldOutlined, MenuUnfoldOutlined, QuestionCircleOutlined, SettingOutlined,
+  ThunderboltOutlined, UserOutlined, VerticalAlignTopOutlined,
+} from '@ant-design/icons'
+import { useAuthStore } from '../store'
+import QuickThoughtFAB from './QuickThoughtFAB'
+import './AppLayout.css'
 
-const { Header, Sider, Content } = Layout
-const { Text } = Typography
+const { Content, Sider } = Layout
 
-const modes = [
-  { key: "dashboard", label: "\u4eea\u8868\u76d8", icon: <AppstoreOutlined />, glow: "#6366f1" },
-  { key: "learn",     label: "\u5b66\u4e60",   icon: <ReadOutlined />,     glow: "#06b6d4" },
-  { key: "resources", label: "\u8d44\u6e90",   icon: <FolderOpenOutlined />, glow: "#8b5cf6" },
-  { key: "profile",   label: "\u4e2a\u4eba",   icon: <SmileOutlined />,    glow: "#ec4899" },
+type NavItem = { key: string; label: string; route: string; icon: React.ReactNode }
+
+const learningItems: NavItem[] = [
+  { key: 'profile', label: '学习画像', route: '/profile', icon: <UserOutlined /> },
+  { key: 'path', label: '学习路径', route: '/path', icon: <ApartmentOutlined /> },
+  { key: 'resources', label: '资源中心', route: '/resources', icon: <FolderOpenOutlined /> },
+  { key: 'qa', label: '智能辅导', route: '/qa', icon: <QuestionCircleOutlined /> },
+  { key: 'evaluation', label: '学习评估', route: '/evaluation', icon: <CheckCircleOutlined /> },
 ]
 
-const modeMenu: Record<string, { key: string; icon: React.ReactNode; label: string }[]> = {
-  dashboard: [],
-  learn: [
-    { key: "/path",   icon: <DeploymentUnitOutlined />, label: "\u5b66\u4e60\u8def\u5f84" },
-    { key: "/qa",     icon: <QuestionCircleOutlined />, label: "\u667a\u80fd\u8f85\u5bfc" },
-    { key: "/courses",icon: <BookOutlined />,           label: "\u8bfe\u7a0b\u7ba1\u7406" },
-  ],
-  resources: [
-    { key: "/resources", icon: <FileTextOutlined />, label: "\u8d44\u6e90\u4e2d\u5fc3" },
-    { key: "/search",    icon: <SearchOutlined />,   label: "\u77e5\u8bc6\u68c0\u7d22" },
-  ],
-  profile: [
-    { key: "/profile",     icon: <UserOutlined />,     label: "\u5bf9\u8bdd\u753b\u50cf" },
-    { key: "/evaluation",  icon: <BarChartOutlined />, label: "\u5b66\u4e60\u8bc4\u4f30" },
-    { key: "/settings",    icon: <SettingOutlined />,  label: "\u7cfb\u7edf\u8bbe\u7f6e" },
-  ],
-}
+const systemItems: NavItem[] = [
+  { key: 'courses', label: '课程管理', route: '/courses', icon: <BookOutlined /> },
+  { key: 'agent', label: 'Agent 工作台', route: '/agent', icon: <ThunderboltOutlined /> },
+  { key: 'settings', label: '系统设置', route: '/settings', icon: <SettingOutlined /> },
+]
 
-const pathToMode = (path: string): string => {
-  if (path === "/dashboard")   return "dashboard"
-  if (["/path","/qa","/courses"].includes(path)) return "learn"
-  if (["/resources","/search"].includes(path))   return "resources"
-  if (["/profile","/evaluation","/settings"].includes(path)) return "profile"
-  return "dashboard"
+const dashboardItem: NavItem = { key: 'dashboard', label: '仪表盘', route: '/dashboard', icon: <DashboardOutlined /> }
+
+const pageNames: Record<string, string> = {
+  '/dashboard': '仪表盘', '/profile': '学习画像', '/path': '学习路径', '/resources': '资源中心',
+  '/qa': '智能辅导', '/evaluation': '学习评估', '/courses': '课程管理', '/agent': 'Agent 工作台', '/settings': '系统设置',
 }
 
 const AppLayout: React.FC = () => {
   const navigate = useNavigate()
   const location = useLocation()
-  const { user, logout } = useAuthStore()
-  const { sidebarCollapsed, toggleSidebar } = useUIStore()
+  const { user } = useAuthStore()
+  const [isMobile, setIsMobile] = useState(() => window.innerWidth < 768)
+  const [sidebarOpen, setSidebarOpen] = useState(() => window.innerWidth >= 768)
+  const [showTop, setShowTop] = useState(false)
 
-  const currentMode = pathToMode(location.pathname)
-  const currentModeMeta = modes.find((m) => m.key === currentMode) || modes[0]
-  const menuItems = modeMenu[currentMode] || []
-  const showSidebar = menuItems.length > 0
-
-  const [ambientColor, setAmbientColor] = useState(currentModeMeta.glow)
   useEffect(() => {
-    setAmbientColor(currentModeMeta.glow)
-  }, [currentModeMeta.glow])
+    const onScroll = () => setShowTop(window.scrollY > 400)
+    window.addEventListener('scroll', onScroll, { passive: true })
+    return () => window.removeEventListener('scroll', onScroll)
+  }, [])
 
-  const handleLogout = () => { logout(); navigate("/login") }
-  const userMenuItems = [
-    { key: "profile", icon: <UserOutlined />, label: "\u4e2a\u4eba\u753b\u50cf", onClick: () => navigate("/profile") },
-    { type: "divider" as const },
-    { key: "logout", icon: <LogoutOutlined />, label: "\u9000\u51fa\u767b\u5f55", onClick: handleLogout },
-  ]
+  useEffect(() => {
+    const onResize = () => {
+      const nextIsMobile = window.innerWidth < 768
+      setIsMobile(nextIsMobile)
+      if (nextIsMobile) setSidebarOpen(false)
+    }
+    window.addEventListener('resize', onResize)
+    return () => window.removeEventListener('resize', onResize)
+  }, [])
+
+
+  const renderNavItem = (item: NavItem) => {
+    const active = item.route === location.pathname
+    return <button key={item.key} type="button" className={`workspace-nav-item ${active ? 'is-active' : ''}`} onClick={() => navigate(item.route)} title={item.label}>
+      <span className="workspace-nav-icon">{item.icon}</span>
+      <span>{item.label}</span>
+    </button>
+  }
 
   return (
-    <Layout style={{ minHeight: "100vh", background: "var(--bg-primary)", position: "relative" }}>
-      <div style={{
-        position: "fixed", top: -200, left: "50%", transform: "translateX(-50%)",
-        width: 600, height: 600, borderRadius: "50%",
-        background: 'radial-gradient(circle, ' + ambientColor + '08 0%, transparent 70%)',
-        pointerEvents: "none", zIndex: 0,
-        transition: 'background 1.2s cubic-bezier(0.19,1,0.22,1)',
-      }} />
-      <div style={{
-        position: "fixed", bottom: -150, right: -100,
-        width: 400, height: 400, borderRadius: "50%",
-        background: 'radial-gradient(circle, ' + ambientColor + '06 0%, transparent 70%)',
-        pointerEvents: "none", zIndex: 0,
-        transition: 'background 1.2s cubic-bezier(0.19,1,0.22,1)',
-      }} />
-      <div style={{
-        position: "fixed", top: 0, left: 0, right: 0, height: 1, zIndex: 9999,
-        background: 'linear-gradient(90deg, transparent, ' + ambientColor + '44, transparent)',
-        animation: 'ambientShift 3s ease-in-out infinite',
-      }} />
-
-      <QuickThoughtFAB />
-
-      <Header style={{
-        height: 64, lineHeight: "64px",
-        background: "rgba(7,11,23,0.85)",
-        backdropFilter: "blur(20px) saturate(1.4)",
-        WebkitBackdropFilter: "blur(20px) saturate(1.4)",
-        borderBottom: "1px solid rgba(255,255,255,0.05)",
-        display: "flex", alignItems: "center", justifyContent: "space-between",
-        padding: "0 32px", position: "sticky", top: 0, zIndex: 200,
-      }}>
-        <Space size={40} style={{ alignItems: "center" }}>
-          <Space style={{ cursor: "pointer", alignItems: "center", gap: 10 }}
-            onClick={() => navigate("/dashboard")}
-          >
-            <div style={{ width: 30, height: 30, borderRadius: 8, background: "linear-gradient(135deg, #06b6d4, #6366f1)", boxShadow: "0 0 20px rgba(99,102,241,0.3)", display: "flex", alignItems: "center", justifyContent: "center" }}>
-              <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-                <path d="M12 2a7 7 0 0 1 7 7c0 2.4-1.2 4.5-3 5.7V18a1 1 0 0 1-1 1H9a1 1 0 0 1-1-1v-3.3C6.2 13.5 5 11.4 5 9a7 7 0 0 1 7-7z" />
-                <path d="M9 21h6" />
-              </svg>
+    <Layout className="workspace-layout">
+      <Layout className="workspace-body">
+        <Sider trigger={null} collapsible collapsed={!sidebarOpen} collapsedWidth={isMobile ? 0 : 68} width={248} className="workspace-sider">
+          <nav className="workspace-navigation" aria-label="学习工作台导航">
+            <div className="workspace-brand">
+              <button type="button" className="workspace-brand-button" onClick={() => navigate('/dashboard')} title="学习工作台首页">
+                <span className="workspace-brand-mark"><ThunderboltOutlined /></span>
+                <span className="workspace-brand-name">知境</span>
+              </button>
+              <button type="button" className="workspace-sidebar-toggle" onClick={() => setSidebarOpen(!sidebarOpen)} title={sidebarOpen ? '收起导航' : '展开导航'} aria-label={sidebarOpen ? '收起导航' : '展开导航'}>
+                {sidebarOpen ? <MenuFoldOutlined /> : <MenuUnfoldOutlined />}
+              </button>
             </div>
-            <Text style={{ fontSize: 17, fontWeight: 700, letterSpacing: -0.3, background: "linear-gradient(135deg, #06b6d4, #a5b4fc)", WebkitBackgroundClip: "text", WebkitTextFillColor: "transparent" }}>
-              Neural
-            </Text>
-          </Space>
-
-          <Space size={4} style={{ background: "rgba(255,255,255,0.035)", borderRadius: 12, padding: 3, border: "1px solid rgba(255,255,255,0.05)" }}>
-            {modes.map((m) => {
-              const active = currentMode === m.key
-              return (
-                <div key={m.key} onClick={() => {
-                  if (m.key === "dashboard") navigate("/dashboard")
-                  else if (m.key === "learn") navigate("/path")
-                  else if (m.key === "resources") navigate("/resources")
-                  else if (m.key === "profile") navigate("/profile")
-                }} style={{
-                  display: "flex", alignItems: "center", gap: 7,
-                  padding: "7px 16px", borderRadius: 9, cursor: "pointer",
-                  transition: "all 0.35s cubic-bezier(0.19,1,0.22,1)",
-                  background: active ? 'linear-gradient(135deg, ' + m.glow + '33, ' + m.glow + '22)' : "transparent",
-                  boxShadow: active ? '0 0 20px ' + m.glow + '1a, inset 0 1px 0 rgba(255,255,255,0.06)' : "none",
-                  color: active ? "#fff" : "rgba(255,255,255,0.40)",
-                  fontWeight: active ? 600 : 500, fontSize: 14, userSelect: "none",
-                }} onMouseEnter={(e) => { if (!active) e.currentTarget.style.background = "rgba(255,255,255,0.05)" }}
-                onMouseLeave={(e) => { if (!active) e.currentTarget.style.background = "transparent" }}>
-                  <span style={{ fontSize: 16, opacity: active ? 1 : 0.5 }}>{m.icon}</span>
-                  <span>{m.label}</span>
-                </div>
-              )
-            })}
-          </Space>
-        </Space>
-
-        <Dropdown menu={{ items: userMenuItems }} placement="bottomRight">
-          <div style={{ cursor: "pointer", display: "flex", alignItems: "center", gap: 10, padding: "4px 10px", borderRadius: 8, transition: "background 0.2s" }} className="header-user-btn">
-            <Avatar icon={<UserOutlined />} style={{ background: "linear-gradient(135deg, #6366f1, #8b5cf6)", boxShadow: "0 0 14px rgba(99,102,241,0.25)" }} />
-            <Text style={{ color: "rgba(255,255,255,0.80)", fontSize: 14 }}>{user?.display_name || user?.username}</Text>
+            <span className="workspace-section-label">学习工作台</span>
+            {renderNavItem(dashboardItem)}
+            <span className="workspace-section-label workspace-section-gap">学习闭环</span>
+            {learningItems.map(renderNavItem)}
+            <span className="workspace-section-label workspace-section-gap">课程与系统</span>
+            {systemItems.map(renderNavItem)}
+          </nav>
+          <div className="workspace-profile-card" title={user?.display_name || user?.username || '学习者'}>
+            <Avatar icon={<UserOutlined />} />
+            <div><strong>{user?.display_name || user?.username || '学习者'}</strong><span>学习空间已就绪</span></div>
           </div>
-        </Dropdown>
-      </Header>
+        </Sider>
 
-      <Layout style={{ background: "var(--bg-primary)", position: "relative", zIndex: 1 }}>
-        {showSidebar && (
-          <Sider trigger={null} collapsible collapsed={sidebarCollapsed} width={200} collapsedWidth={0}
-            theme="dark" style={{ background: "transparent", borderRight: "1px solid rgba(255,255,255,0.03)", overflow: "hidden", transition: "all 0.3s cubic-bezier(0.4,0,0.2,1)" }}>
-            <div style={{ height: 44, display: "flex", alignItems: "center", padding: "0 20px", borderBottom: "1px solid rgba(255,255,255,0.03)" }}>
-              <Text style={{ color: "rgba(255,255,255,0.20)", fontSize: 10, letterSpacing: 1.5, textTransform: "uppercase", fontWeight: 600 }}>
-                {modes.find((m) => m.key === currentMode)?.label || ""}
-              </Text>
+        <Layout className={`workspace-main ${location.pathname === '/dashboard' ? 'workspace-main--dashboard' : 'workspace-main--workspace'}`}>
+          <header className="workspace-topbar">
+            <div className="workspace-page-context">
+              <button type="button" className="workspace-menu-button" onClick={() => setSidebarOpen(!sidebarOpen)} aria-label={sidebarOpen ? '收起导航' : '展开导航'}>
+                {sidebarOpen ? <MenuFoldOutlined /> : <MenuUnfoldOutlined />}
+              </button>
+              <div>
+                <Breadcrumb items={[{ title: '学习工作台' }, { title: pageNames[location.pathname] || '工作区' }]} />
+                <strong>{pageNames[location.pathname] || '工作区'}</strong>
+              </div>
             </div>
-            <Menu theme="dark" mode="inline" selectedKeys={[location.pathname]} items={menuItems}
-              onClick={({ key }) => navigate(key)} style={{ background: "transparent", borderRight: "none", paddingTop: 6 }}
-            />
-          </Sider>
-        )}
-        <Content style={{
-          padding: showSidebar ? "28px 32px" : "28px 32px",
-          minHeight: "calc(100vh - 64px)",
-          animation: "fadeInUp 0.5s cubic-bezier(0.19,1,0.22,1)",
-          maxWidth: showSidebar ? undefined : 1200,
-          margin: showSidebar ? undefined : "0 auto",
-          width: "100%",
-        }}>
-          <Outlet />
-        </Content>
+            <button type="button" className="workspace-account-button" onClick={() => navigate('/profile')} aria-label="查看学习画像">
+              <Avatar size={30} icon={<UserOutlined />} />
+              <span>{user?.display_name || user?.username || '学习者'}</span>
+            </button>
+          </header>
+          <Content className={`workspace-content ${location.pathname === '/dashboard' ? 'workspace-content--dashboard' : 'workspace-content--workspace'}`}>
+            <div className="fade-in"><Outlet /></div>
+          </Content>
+        </Layout>
       </Layout>
+
+      {!sidebarOpen && <button type="button" className="workspace-expand-rail" onClick={() => setSidebarOpen(true)} title="展开导航"><MenuFoldOutlined /></button>}
+      <QuickThoughtFAB />
+      {showTop && <FloatButton icon={<VerticalAlignTopOutlined />} type="default" className="workspace-back-top" onClick={() => window.scrollTo({ top: 0, behavior: 'smooth' })} />}
     </Layout>
   )
 }

@@ -1,84 +1,74 @@
-import React, { useState } from 'react'
-import { Input, message } from 'antd'
-import { PlusOutlined, BulbOutlined } from '@ant-design/icons'
+﻿import React, { useEffect, useRef, useState } from 'react'
+import { Button, Input, message, Spin } from 'antd'
+import { MessageOutlined, RobotOutlined, SendOutlined } from '@ant-design/icons'
+import { chatApi } from '../services/api'
+import './QuickThoughtFAB.css'
 
 const { TextArea } = Input
 
 const QuickThoughtFAB: React.FC = () => {
   const [open, setOpen] = useState(false)
   const [text, setText] = useState('')
+  const [loading, setLoading] = useState(false)
+  const [fabVisible, setFabVisible] = useState(true)
+  const lastScrollY = useRef(0)
 
-  const handleSubmit = () => {
+  useEffect(() => {
+    const onScroll = () => {
+      const sy = window.scrollY
+      setFabVisible(!(sy > lastScrollY.current && sy > 200))
+      lastScrollY.current = sy
+    }
+    window.addEventListener("scroll", onScroll, { passive: true })
+    return () => window.removeEventListener("scroll", onScroll)
+  }, [])
+
+  const handleSubmit = async () => {
     if (!text.trim()) return
-    message.success({
-      icon: <BulbOutlined style={{ color: '#fbbf24' }} />,
-      content: '\u60f3\u6cd5\u5df2\u8bb0\u5f55 \u2728',
-      duration: 2,
-    })
-    setText('')
-    setOpen(false)
+    setLoading(true)
+    try {
+      const res = await chatApi.send(text.trim())
+      message.success({
+        icon: <RobotOutlined style={{ color: '#2563eb' }} />,
+        content: res.data.message || 'Agent 已完成任务',
+        duration: 6,
+      })
+      setText('')
+      setOpen(false)
+    } catch (err: any) {
+      message.error(err?.response?.data?.detail || 'Agent 处理失败')
+    } finally {
+      setLoading(false)
+    }
   }
 
   return (
     <>
-      <div
+      <button
+        type="button"
+        className={`quick-thought-trigger ${fabVisible ? '' : 'is-hidden'}`}
         onClick={() => setOpen(!open)}
-        style={{
-          position: 'fixed', bottom: 32, right: 32, zIndex: 999,
-          width: 44, height: 44, borderRadius: '50%',
-          background: 'linear-gradient(135deg, #6366f1, #8b5cf6)',
-          boxShadow: '0 4px 20px rgba(99,102,241,0.3), 0 0 40px rgba(99,102,241,0.1)',
-          display: 'flex', alignItems: 'center', justifyContent: 'center',
-          cursor: 'pointer',
-          transition: 'all 0.35s cubic-bezier(0.19,1,0.22,1)',
-          transform: open ? 'rotate(45deg)' : 'rotate(0deg)',
-        }}
-        onMouseEnter={(e) => { e.currentTarget.style.transform = open ? 'rotate(45deg) scale(1.1)' : 'scale(1.1)'; e.currentTarget.style.boxShadow = '0 6px 28px rgba(99,102,241,0.4)' }}
-        onMouseLeave={(e) => { e.currentTarget.style.transform = open ? 'rotate(45deg)' : 'scale(1)'; e.currentTarget.style.boxShadow = '0 4px 20px rgba(99,102,241,0.3)' }}
+        aria-expanded={open}
+        aria-controls="quick-thought-panel"
       >
-        <PlusOutlined style={{ color: 'white', fontSize: 18 }} />
-      </div>
+        <MessageOutlined aria-hidden="true" />
+        <span>{open ? '收起对话' : '新建对话'}</span>
+      </button>
       {open && (
         <>
-          <div
-            onClick={() => setOpen(false)}
-            style={{
-              position: 'fixed', inset: 0, zIndex: 998,
-              background: 'rgba(0,0,0,0.3)',
-              backdropFilter: 'blur(2px)',
-            }}
-          />
-          <div className='animate-thought-appear' style={{
-            position: 'fixed', bottom: 88, right: 32, zIndex: 999,
-            width: 280,
-            background: 'rgba(20,27,45,0.95)',
-            backdropFilter: 'blur(16px)',
-            border: '1px solid rgba(255,255,255,0.08)',
-            borderRadius: 14,
-            padding: 16,
-            boxShadow: '0 8px 40px rgba(0,0,0,0.5)',
-          }}>
-            <div style={{
-              fontSize: 11, fontWeight: 600, letterSpacing: 1,
-              color: 'rgba(255,255,255,0.20)', textTransform: 'uppercase',
-              marginBottom: 10,
-            }}>
-              <BulbOutlined style={{ marginRight: 6 }} />
-              {'\u8bb0'}{'\u4e00'}{'\u4e2a'}{'\u60f3'}{'\u6cd5'}
+          <button type="button" className="quick-thought-backdrop" aria-label="关闭新建对话面板" onClick={() => setOpen(false)} />
+          <section id="quick-thought-panel" className="quick-thought-panel fade-in" aria-label="新建学习对话">
+            <div className="quick-thought-heading">
+              <RobotOutlined style={{ marginRight: 6 }} />
+              全局学习 Agent
             </div>
             <TextArea
               value={text}
               onChange={(e) => setText(e.target.value)}
-              placeholder='\u60f3\u5230\u4e86\u4ec0\u4e48\uff1f'
+              placeholder='例如：更新我的画像、生成学习路径、评估我的学习...'
+              disabled={loading}
               autoSize={{ minRows: 2, maxRows: 5 }}
-              style={{
-                background: 'rgba(255,255,255,0.04)',
-                border: '1px solid rgba(255,255,255,0.08)',
-                color: 'rgba(255,255,255,0.80)',
-                fontSize: 13,
-                borderRadius: 8,
-                resize: 'none',
-              }}
+              className="quick-thought-input"
               onKeyDown={(e) => {
                 if (e.key === 'Enter' && !e.shiftKey) {
                   e.preventDefault()
@@ -86,24 +76,14 @@ const QuickThoughtFAB: React.FC = () => {
                 }
               }}
             />
-            <div style={{
-              display: 'flex', justifyContent: 'flex-end', marginTop: 10,
-            }}>
-              <div
-                onClick={handleSubmit}
-                style={{
-                  padding: '6px 16px', borderRadius: 8,
-                  background: 'linear-gradient(135deg, #6366f1, #8b5cf6)',
-                  color: 'white', fontSize: 12, fontWeight: 600,
-                  cursor: 'pointer', letterSpacing: 1,
-                  transition: 'opacity 0.2s',
-                  opacity: text.trim() ? 1 : 0.4,
-                }}
-              >
-                {'\u8bb0'}{'\u5f55'}
-              </div>
+            <div className="quick-thought-actions">
+              {loading && <span className="quick-thought-status"><Spin size="small" /> 正在处理…</span>}
+              <Button type="primary" icon={!loading && <SendOutlined />} disabled={!text.trim() || loading} loading={loading} onClick={() => void handleSubmit()}>
+                发送给 Agent
+              </Button>
             </div>
-          </div>
+            <p className="quick-thought-hint">Enter 发送，Shift + Enter 换行</p>
+          </section>
         </>
       )}
     </>

@@ -1,0 +1,4 @@
+-r requirements-docker.txt
+
+# Optional acceleration backend. Install only on a compatible CUDA host.
+onnxruntime-gpu>=1.20.0

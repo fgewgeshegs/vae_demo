@@ -1,0 +1,6 @@
+-r requirements.txt
+
+# Local BGE embedding and reranking models are mounted at runtime.
+sentence-transformers>=2.7.0
+FlagEmbedding>=1.2.11
+faiss-cpu>=1.8.0

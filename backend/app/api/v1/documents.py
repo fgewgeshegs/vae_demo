@@ -4,9 +4,10 @@ from __future__ import annotations
 
 import os
 import uuid
+import asyncio
 from pathlib import Path
 
-from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, UploadFile, File, Form, status
+from fastapi import APIRouter, Depends, HTTPException, UploadFile, File, Form, status
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -20,6 +21,8 @@ from app.services.document_parser import DocumentParser
 from app.services.chunker import TextChunker
 from app.services.embedder import Embedder
 from loguru import logger
+from app.services.document_queue import enqueue_document, get_document_task_status
+from app.services.redis_client import invalidate_cache
 
 router = APIRouter()
 
@@ -35,7 +38,7 @@ async def list_documents(
     """获取课程的文档列表"""
     result = await db.execute(
         select(Document)
-        .where(Document.course_id == course_id)
+        .where(Document.course_id == course_id, Document.user_id == current_user.id)
         .order_by(Document.created_at.desc())
     )
     docs = result.scalars().all()
@@ -47,7 +50,6 @@ async def upload_document(
     course_id: int = Form(...),
     title: str = Form(...),
     file: UploadFile = File(...),
-    background_tasks: BackgroundTasks = BackgroundTasks(),
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
@@ -73,20 +75,24 @@ async def upload_document(
     save_name = f"{file_id}_{file.filename}"
     save_path = upload_dir / save_name
 
-    content = await file.read()
-    if len(content) > settings.MAX_UPLOAD_SIZE:
-        raise HTTPException(status_code=400, detail="文件大小超过限制（50MB）")
-
-    save_path.write_bytes(content)
-
+    file_size = 0
+    with save_path.open("wb") as destination:
+        while chunk := await file.read(1024 * 1024):
+            file_size += len(chunk)
+            if file_size > settings.MAX_UPLOAD_SIZE:
+                destination.close()
+                save_path.unlink(missing_ok=True)
+                raise HTTPException(status_code=413, detail="File size exceeds upload limit")
+            await asyncio.to_thread(destination.write, chunk)
     # 创建记录
     doc = Document(
         course_id=course_id,
         title=title,
         file_type=file_type,
         file_path=str(save_path),
-        file_size=len(content),
+        file_size=file_size,
         status="pending",
+        user_id=current_user.id,
     )
     db.add(doc)
     await db.flush()
@@ -94,7 +100,13 @@ async def upload_document(
     await db.refresh(doc)
 
     # 后台处理：解析 → 切片 → 向量化
-    background_tasks.add_task(process_document, doc.id)
+    try:
+        await enqueue_document(doc.id)
+    except Exception as exc:
+        doc.status = "error"
+        await db.commit()
+        logger.exception(f"Failed to enqueue document #{doc.id}: {exc}")
+        raise HTTPException(status_code=503, detail="Document processing queue is unavailable")
 
     return DocumentResponse.model_validate(doc)
 
@@ -106,7 +118,10 @@ async def get_document(
     current_user: User = Depends(get_current_user),
 ):
     """获取文档详情"""
-    result = await db.execute(select(Document).where(Document.id == doc_id))
+    query = select(Document).where(Document.id == doc_id)
+    if not current_user.is_admin:
+        query = query.where(Document.user_id == current_user.id)
+    result = await db.execute(query)
     doc = result.scalar_one_or_none()
     if not doc:
         raise HTTPException(status_code=404, detail="文档不存在")
@@ -120,13 +135,26 @@ async def get_document_chunks(
     current_user: User = Depends(get_current_user),
 ):
     """获取文档切片"""
-    result = await db.execute(
-        select(DocumentChunk)
-        .where(DocumentChunk.document_id == doc_id)
-        .order_by(DocumentChunk.chunk_index)
-    )
+    query = select(DocumentChunk).join(Document).where(DocumentChunk.document_id == doc_id)
+    if not current_user.is_admin:
+        query = query.where(Document.user_id == current_user.id)
+    result = await db.execute(query.order_by(DocumentChunk.chunk_index))
     chunks = result.scalars().all()
     return [DocumentChunkResponse.model_validate(c) for c in chunks]
+
+
+@router.get("/{doc_id}/task", response_model=dict)
+async def get_document_task(
+    doc_id: int,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    query = select(Document).where(Document.id == doc_id)
+    if not current_user.is_admin:
+        query = query.where(Document.user_id == current_user.id)
+    if (await db.execute(query)).scalar_one_or_none() is None:
+        raise HTTPException(status_code=404, detail="Document not found")
+    return await get_document_task_status(doc_id)
 
 
 @router.delete("/{doc_id}", status_code=status.HTTP_204_NO_CONTENT)
@@ -136,7 +164,10 @@ async def delete_document(
     current_user: User = Depends(get_current_user),
 ):
     """删除文档"""
-    result = await db.execute(select(Document).where(Document.id == doc_id))
+    query = select(Document).where(Document.id == doc_id)
+    if not current_user.is_admin:
+        query = query.where(Document.user_id == current_user.id)
+    result = await db.execute(query)
     doc = result.scalar_one_or_none()
     if not doc:
         raise HTTPException(status_code=404, detail="文档不存在")
@@ -148,6 +179,7 @@ async def delete_document(
 
     await db.delete(doc)
     await db.commit()
+    await invalidate_cache("retrieval:*")
 
 
 async def process_document(doc_id: int):
@@ -159,7 +191,7 @@ async def process_document(doc_id: int):
             doc = result.scalar_one_or_none()
             if not doc:
                 logger.error(f"文档 #{doc_id} 不存在")
-                return
+                raise FileNotFoundError(f"Document #{doc_id} does not exist")
 
             # 更新状态为处理中
             doc.status = "processing"
@@ -171,20 +203,27 @@ async def process_document(doc_id: int):
             doc.content = text
 
             # 2. 切片
-            chunker = TextChunker(chunk_size=500, overlap=50)
+            chunker = TextChunker(
+                chunk_size=settings.MAX_CHUNK_SIZE,
+                overlap=max(1, settings.MAX_CHUNK_SIZE // 10),
+            )
             chunks_data = chunker.chunk(text, metadata={"document_id": doc.id, "course_id": doc.course_id})
             logger.info(f"文档 #{doc_id} 切分为 {len(chunks_data)} 个切片")
 
             if not chunks_data:
                 doc.status = "ready"
                 await db.commit()
+                await invalidate_cache("retrieval:*")
                 logger.info(f"文档 #{doc_id} 处理完成（无内容）")
                 return
 
             # 3. 向量化（批量）
             embedder = Embedder()
             texts = [c["content"] for c in chunks_data]
-            embeddings = await embedder.embed_batch(texts)
+            embeddings = []
+            batch_size = settings.DOCUMENT_EMBED_BATCH_SIZE
+            for start in range(0, len(texts), batch_size):
+                embeddings.extend(await embedder.embed_batch(texts[start : start + batch_size]))
 
             # 4. 保存切片
             for i, chunk_data in enumerate(chunks_data):
@@ -203,6 +242,7 @@ async def process_document(doc_id: int):
 
             doc.status = "ready"
             await db.commit()
+            await invalidate_cache("retrieval:*")
             logger.info(f"文档 #{doc_id} 处理完成，生成 {len(chunks_data)} 个切片")
 
     except Exception as e:
@@ -216,3 +256,4 @@ async def process_document(doc_id: int):
                     await db.commit()
         except Exception as e:
             logger.warning(f"文档处理错误状态保存失败: {e}")
+        raise

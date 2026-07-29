@@ -95,6 +95,9 @@ export interface StudentProfile {
     learning_pace: Record<string, unknown>
     interest_direction: Record<string, unknown>
     weak_points: string[]
+    learning_habits?: Record<string, unknown>
+    motivation_factors?: Record<string, unknown>
+    _meta?: Record<string, unknown>
   }
   version: number
   created_at: string
@@ -109,6 +112,10 @@ export interface StudyPath {
   path_data: {
     nodes: StudyPathNode[]
     current_index: number
+    course_title?: string
+    description?: string
+    estimated_total_minutes?: number
+    strategies_applied?: string[]
   }
   progress: number
   is_active: boolean
@@ -120,8 +127,14 @@ export interface StudyPath {
 export interface StudyPathNode {
   id: string
   title: string
-  type: 'learn' | 'practice' | 'review' | 'exam'
+  type: 'preview' | 'learn' | 'practice' | 'review' | 'exam'
+  chapter_id?: number | null
   knowledge_point_id?: number
+  chapter_title?: string | null
+  knowledge_point_title?: string | null
+  resource_ids?: number[]
+  learning_content?: string | null
+  difficulty?: string | null
   status: 'pending' | 'in_progress' | 'completed'
   estimated_minutes: number
   completed_at?: string
@@ -151,6 +164,99 @@ export interface Evaluation {
   created_at: string
 }
 
+/** 仪表盘聚合状态 */
+export interface DashboardOverview {
+  status: 'ready' | 'no_path' | 'no_profile' | 'partial'
+  generated_at: string
+  current_task: {
+    path_id: number
+    course_id: number
+    course_title: string
+    node_id: string
+    title: string
+    node_type: 'preview' | 'learn' | 'practice' | 'review' | 'exam'
+    difficulty: string | null
+    estimated_minutes: number
+    progress_percent: number
+    resource_ids: number[]
+    primary_action: { label: string; target: '/path' }
+    next_step: string | null
+  } | null
+  recommendation: {
+    headline: string
+    reasons: Array<{
+      kind: 'knowledge_gap' | 'weak_point' | 'evaluation_signal' | 'learning_pace'
+      label: string
+      evidence: string
+    }>
+    profile_version: number | null
+  } | null
+  learning_state: {
+    completed_nodes: number
+    total_nodes: number
+    recent_qa_count: number
+    last_activity_at: string | null
+  }
+  feedback: {
+    message: string
+    source: 'evaluation' | 'path_progress' | 'profile'
+    strategy_signal: string | null
+  } | null
+  profile_summary: {
+    version: number
+    profile_data: StudentProfile['profile_data']
+    knowledge_gaps: string[]
+    weak_points: string[]
+  } | null
+  today_tasks: Array<{
+    id: string
+    title: string
+    node_type: 'preview' | 'learn' | 'practice' | 'review' | 'exam' | string
+    estimated_minutes: number
+    status: 'pending' | 'in_progress' | string
+  }>
+  learning_activity: {
+    daily: Array<{ date: string; minutes: number; tasks: number }>
+    hourly: Array<{ hour: number; minutes: number; tasks: number }>
+    week_minutes: number
+    active_days: number
+  }
+}
+
+/** 学习任务 */
+export interface LearningTaskStep {
+  name: string
+  status: 'pending' | 'running' | 'done' | 'failed' | 'skipped' | string
+  label?: string | null
+  error?: string | null
+}
+
+export interface AgentResult {
+  agent: string
+  status: 'success' | 'failed' | string
+  type: string
+  data: Record<string, unknown>
+  state_updates: Record<string, unknown>[]
+  artifacts: Record<string, unknown>[]
+  next_actions: Record<string, unknown>[]
+  errors: Record<string, unknown>[]
+  message?: string
+}
+
+export interface LearningTask {
+  id: number
+  task_type: 'generate_study_path' | 'update_profile' | 'generate_learning_resource' | 'pre_generate_course_resources' | 'generate_evaluation'
+  user_id: number
+  course_id: number | null
+  status: 'running' | 'succeeded' | 'failed' | string
+  input: Record<string, unknown>
+  steps: LearningTaskStep[]
+  result: Record<string, unknown> & { agents?: AgentResult[]; message?: string }
+  error: string | null
+  created_at: string
+  updated_at: string
+}
+
 /** 系统配置 */
 export interface SystemConfig {
   id: number
@@ -169,4 +275,31 @@ export interface APIResponse<T> {
   code: number
   message: string
   data: T | null
+}
+
+/** 章节学习计划 */
+export interface ChapterPlan {
+  chapter_id: number
+  tasks: ChapterTask[]
+  estimated_total_minutes: number
+  description: string
+}
+
+/** 学习计划任务项 */
+export interface ChapterTask {
+  task_id: string
+  task_type: string
+  title: string
+  description: string
+  estimated_minutes: number
+  resource_types: string[]
+  difficulty: string
+}
+
+/** 任务进度 */
+export interface TaskProgress {
+  task_id: string
+  status: string
+  correct_rate?: number
+  score?: number
 }

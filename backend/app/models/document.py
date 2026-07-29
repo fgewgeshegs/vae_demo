@@ -43,7 +43,7 @@ class DocumentChunk(Base):
     document_id: Mapped[int] = mapped_column(ForeignKey("documents.id", ondelete="CASCADE"))
     chunk_index: Mapped[int] = mapped_column(Integer)
     content: Mapped[str] = mapped_column(Text)
-    embedding: Mapped[list[float] | None] = mapped_column(VECTOR(1536), nullable=True)
+    embedding: Mapped[list[float] | None] = mapped_column(VECTOR(1024), nullable=True)
     chunk_metadata: Mapped[dict | None] = mapped_column("metadata", JSONB, default=dict)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
 

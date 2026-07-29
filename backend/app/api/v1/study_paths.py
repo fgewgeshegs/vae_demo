@@ -11,6 +11,7 @@ from app.core.security import get_current_user
 from app.models.user import User
 from app.models.study_path import StudyPath
 from app.schemas.study_path import StudyPathResponse, StudyPathUpdate
+from app.services.event_service import EventService, EventType
 
 router = APIRouter()
 
@@ -68,9 +69,39 @@ async def update_study_path(
         raise HTTPException(status_code=404, detail="学习路径不存在")
 
     update_data = data.model_dump(exclude_unset=True)
+    previous_nodes = path.path_data.get("nodes", []) if path.path_data else []
+    previous_completed = {
+        index
+        for index, node in enumerate(previous_nodes)
+        if isinstance(node, dict) and node.get("status") == "completed"
+    }
     for key, value in update_data.items():
         setattr(path, key, value)
     await db.flush()
     await db.commit()
     await db.refresh(path)
+    updated_nodes = path.path_data.get("nodes", []) if path.path_data else []
+    newly_completed = [
+        (index, node)
+        for index, node in enumerate(updated_nodes)
+        if (
+            isinstance(node, dict)
+            and node.get("status") == "completed"
+            and index not in previous_completed
+        )
+    ]
+    for index, node in newly_completed:
+        await EventService.emit(
+            user_id=current_user.id,
+            course_id=path.course_id,
+            event_type=EventType.NODE_COMPLETED,
+            source_agent="StudyPathAPI",
+            target_type="study_path",
+            target_id=path.id,
+            payload={
+                "node_index": index,
+                "node": node,
+                "progress": path.progress,
+            },
+        )
     return StudyPathResponse.model_validate(path)

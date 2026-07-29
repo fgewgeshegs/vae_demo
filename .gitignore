@@ -32,6 +32,7 @@ frontend/.vite/
 # Logs
 *.log
 logs/
+.runtime/
 
 # Uploads
 uploads/

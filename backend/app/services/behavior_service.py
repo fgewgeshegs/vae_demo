@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from typing import Optional
 
 from sqlalchemy import select, func
@@ -10,6 +10,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.database import async_session_factory
 from app.models.learning_behavior import LearningBehavior
+from app.core.config import settings
 from loguru import logger
 
 
@@ -48,32 +49,43 @@ class BehaviorService:
     async def get_user_stats(user_id: int, course_id: Optional[int] = None) -> dict:
         """获取用户学习行为统计"""
         async with async_session_factory() as db:
-            query = select(LearningBehavior).where(
-                LearningBehavior.user_id == user_id
+            since = datetime.now(timezone.utc) - timedelta(days=settings.ANALYTICS_LOOKBACK_DAYS)
+            base_filters = (
+                LearningBehavior.user_id == user_id,
+                LearningBehavior.created_at >= since,
             )
-
-            result = await db.execute(query)
-            behaviors = result.scalars().all()
-
-            total_count = len(behaviors)
-            action_type_counts = {}
-            total_duration = 0
-            active_dates = set()
-            daily_counts = {}
-
-            for b in behaviors:
-                action_type_counts[b.action_type] = action_type_counts.get(b.action_type, 0) + 1
-                total_duration += (b.duration_seconds or 0)
-                if b.created_at:
-                    date_key = b.created_at.date()
-                    active_dates.add(date_key)
-                    daily_counts[date_key.isoformat()] = daily_counts.get(date_key.isoformat(), 0) + 1
+            summary = (
+                await db.execute(
+                    select(
+                        func.count(LearningBehavior.id),
+                        func.coalesce(func.sum(LearningBehavior.duration_seconds), 0),
+                        func.count(func.distinct(func.date(LearningBehavior.created_at))),
+                    ).where(*base_filters)
+                )
+            ).one()
+            action_rows = (
+                await db.execute(
+                    select(LearningBehavior.action_type, func.count(LearningBehavior.id))
+                    .where(*base_filters)
+                    .group_by(LearningBehavior.action_type)
+                )
+            ).all()
+            daily_rows = (
+                await db.execute(
+                    select(func.date(LearningBehavior.created_at), func.count(LearningBehavior.id))
+                    .where(*base_filters)
+                    .group_by(func.date(LearningBehavior.created_at))
+                )
+            ).all()
+            total_count, total_duration, active_days = summary
+            action_type_counts = dict(action_rows)
+            daily_counts = {day.isoformat(): count for day, count in daily_rows}
 
             return {
                 "total_count": total_count,
                 "action_types": action_type_counts,
                 "total_duration_minutes": round(total_duration / 60, 1),
-                "active_days": len(active_dates),
+                "active_days": active_days,
                 "daily_counts": daily_counts,
             }
 
@@ -137,3 +149,4 @@ class ActionType:
     # 系统行为
     LOGIN = "login"
     LOGOUT = "logout"
+    RUN_LEARNING_TASK = "run_learning_task"

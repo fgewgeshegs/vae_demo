@@ -7,7 +7,7 @@
 from __future__ import annotations
 
 import json
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 
 from sqlalchemy import select, func, and_
 
@@ -20,7 +20,10 @@ from app.models.qa_record import QARecord
 from app.models.study_path import StudyPath
 from app.models.learning_resource import LearningResource
 from app.prompts.eval_prompts import EVALUATION_PROMPT
+from app.services.event_service import EventService, EventType
 from app.services.learning_strategies import LearningStrategyEngine, LearningStrategy
+from app.services.student_state import StudentStateService
+from app.core.config import settings
 from loguru import logger
 
 
@@ -30,6 +33,7 @@ class EvalAgent:
     def __init__(self):
         self.llm = LLMGateway()
         self.strategy_engine = LearningStrategyEngine()
+        self.student_state = StudentStateService()
 
     async def process(self, state: dict) -> dict:
         """生成学习评估"""
@@ -94,31 +98,41 @@ class EvalAgent:
 
     async def _collect_learning_data(self, user_id: int, course_id: int | None) -> dict:
         """收集用户学习数据"""
+        return await self.student_state.collect_learning_data(user_id, course_id)
         async with async_session_factory() as db:
             # 行为统计数据
-            behavior_count = 0
-            action_type_counts = {}
-            total_duration = 0
-
-            behavior_query = select(LearningBehavior).where(
-                LearningBehavior.user_id == user_id
+            since = datetime.now(timezone.utc) - timedelta(days=settings.ANALYTICS_LOOKBACK_DAYS)
+            behavior_filters = (
+                LearningBehavior.user_id == user_id,
+                LearningBehavior.created_at >= since,
             )
-            result = await db.execute(behavior_query)
-            behaviors = result.scalars().all()
-            behavior_count = len(behaviors)
-
-            for b in behaviors:
-                action_type_counts[b.action_type] = action_type_counts.get(b.action_type, 0) + 1
-                total_duration += (b.duration_seconds or 0)
+            behavior_count, total_duration, active_days = (
+                await db.execute(
+                    select(
+                        func.count(LearningBehavior.id),
+                        func.coalesce(func.sum(LearningBehavior.duration_seconds), 0),
+                        func.count(func.distinct(func.date(LearningBehavior.created_at))),
+                    ).where(*behavior_filters)
+                )
+            ).one()
+            action_type_counts = dict(
+                (
+                    await db.execute(
+                        select(LearningBehavior.action_type, func.count(LearningBehavior.id))
+                        .where(*behavior_filters)
+                        .group_by(LearningBehavior.action_type)
+                    )
+                ).all()
+            )
 
             # 问答统计
-            qa_query = select(QARecord).where(QARecord.user_id == user_id)
+            qa_query = select(
+                func.count(QARecord.id),
+                func.count(QARecord.answer),
+            ).where(QARecord.user_id == user_id, QARecord.created_at >= since)
             if course_id:
                 qa_query = qa_query.where(QARecord.course_id == course_id)
-            result = await db.execute(qa_query.order_by(QARecord.created_at.desc()))
-            qa_records = result.scalars().all()
-            qa_count = len(qa_records)
-            answered_count = sum(1 for r in qa_records if r.answer)
+            qa_count, answered_count = (await db.execute(qa_query)).one()
 
             # 学习进度
             path_query = select(StudyPath).where(
@@ -169,12 +183,6 @@ class EvalAgent:
             profile_data = profile.profile_data if profile else {}
 
         # 识别活跃天数
-        active_dates = set()
-        for b in behaviors:
-            if b.created_at:
-                active_dates.add(b.created_at.date())
-        active_days = len(active_dates)
-
         learning_data = {
             "is_empty": behavior_count == 0 and qa_count == 0 and resource_count == 0,
             "behavior": {
@@ -208,9 +216,12 @@ class EvalAgent:
 
     async def _generate_evaluation(self, learning_data: dict) -> dict:
         """调用 LLM 生成评估报告"""
+        provider = self.llm.provider.value
+        model = self.llm.config.get("model", "")
         try:
+            prompt_data = self._prepare_llm_learning_data(learning_data)
             prompt = EVALUATION_PROMPT.format(
-                learning_data=json.dumps(learning_data, ensure_ascii=False, indent=2)
+                learning_data=json.dumps(prompt_data, ensure_ascii=False, indent=2)
             )
 
             response = await self.llm.chat(
@@ -231,12 +242,7 @@ class EvalAgent:
 
             # 解析 JSON
             content = response.content.strip()
-            if "```json" in content:
-                content = content.split("```json")[1].split("```")[0].strip()
-            elif "```" in content:
-                content = content.split("```")[1].split("```")[0].strip()
-
-            evaluation = json.loads(content)
+            evaluation = self._extract_json_object(content)
 
             # 确保所有必要字段存在
             if "scores" not in evaluation:
@@ -245,12 +251,98 @@ class EvalAgent:
                 evaluation["suggestions"] = []
             if "strategy_signals" not in evaluation:
                 evaluation["strategy_signals"] = {}
+            evaluation["scores"] = self._normalize_scores(evaluation["scores"])
+            evaluation["_meta"] = {
+                "source": "llm",
+                "provider": response.provider,
+                "model": response.model,
+                "usage": response.usage,
+                "raw_preview": content[:500],
+            }
+            logger.info(
+                "LLM evaluation generated: provider={}, model={}, scores={}",
+                response.provider,
+                response.model,
+                evaluation["scores"],
+            )
 
             return evaluation
 
         except Exception as e:
-            logger.error(f"LLM 评估生成失败，使用规则评估: {e}")
-            return self._rule_based_evaluation(learning_data)
+            logger.exception("LLM 评估生成失败，使用规则评估")
+            evaluation = self._rule_based_evaluation(learning_data)
+            evaluation["_meta"] = {
+                "source": "rule_fallback",
+                "provider": provider,
+                "model": model,
+                "error": str(e),
+            }
+            return evaluation
+
+    def _prepare_llm_learning_data(self, learning_data: dict) -> dict:
+        """Reduce historical-score anchoring before sending data to the LLM."""
+        prompt_data = dict(learning_data)
+        score_trends = learning_data.get("score_trends", [])
+        averages = []
+        for item in score_trends:
+            scores = item.get("scores", {}) if isinstance(item, dict) else {}
+            values = [v for v in scores.values() if isinstance(v, (int, float))]
+            if values:
+                averages.append(round(sum(values) / len(values), 1))
+
+        trend = "none"
+        if len(averages) >= 2:
+            diff = averages[-1] - averages[0]
+            if diff > 3:
+                trend = "rising"
+            elif diff < -3:
+                trend = "falling"
+            else:
+                trend = "stable"
+
+        prompt_data["score_trend_summary"] = {
+            "evaluation_count": len(score_trends),
+            "previous_average": averages[-1] if averages else None,
+            "trend": trend,
+        }
+        prompt_data.pop("score_trends", None)
+        return prompt_data
+
+    def _extract_json_object(self, content: str) -> dict:
+        """Extract the first JSON object from an LLM response."""
+        text = content.strip()
+        if "```json" in text:
+            text = text.split("```json", 1)[1].split("```", 1)[0].strip()
+        elif "```" in text:
+            text = text.split("```", 1)[1].split("```", 1)[0].strip()
+
+        start = text.find("{")
+        end = text.rfind("}")
+        if start == -1 or end == -1 or end <= start:
+            raise ValueError("LLM response does not contain a JSON object")
+        parsed = json.loads(text[start:end + 1])
+        if not isinstance(parsed, dict):
+            raise ValueError("LLM JSON must be an object")
+        return parsed
+
+    def _normalize_scores(self, scores: dict) -> dict:
+        """Coerce evaluation scores to 0-100 integers."""
+        dimensions = [
+            "knowledge_mastery",
+            "learning_efficiency",
+            "engagement",
+            "consistency",
+            "improvement",
+        ]
+        normalized = {}
+        for key in dimensions:
+            value = scores.get(key, 0) if isinstance(scores, dict) else 0
+            try:
+                number = int(round(float(value)))
+            except (TypeError, ValueError):
+                number = 0
+            normalized[key] = min(100, max(0, number))
+        return normalized
 
     def _rule_based_evaluation(self, learning_data: dict) -> dict:
         """基于规则的评估（LLM 失败时备用）"""
@@ -337,23 +429,34 @@ class EvalAgent:
         }
 
     def _apply_strategies(self, evaluation: dict, learning_data: dict) -> dict:
-        """应用学习策略并生成策略调整信号"""
+        """应用学习策略并生成策略调整信号，包含可追踪的 next_actions"""
         scores = evaluation.get("scores", {})
         knowledge_mastery = scores.get("knowledge_mastery", 50)
         consistency = scores.get("consistency", 50)
         engagement = scores.get("engagement", 50)
 
-        strategy_signals = {
+        strategy_signals: dict = {
             "adjust_pace": consistency < 50,
             "review_suggested": knowledge_mastery < 70,
             "difficulty_change": "same",
         }
+        next_actions: list[dict] = []
 
         # 确定难度调整
         if knowledge_mastery < 40:
             strategy_signals["difficulty_change"] = "easier"
+            next_actions.append({
+                "action": "reduce_difficulty",
+                "target": "easier",
+                "reason": "knowledge_mastery below 40, foundational gaps detected",
+            })
         elif knowledge_mastery > 85:
             strategy_signals["difficulty_change"] = "harder"
+            next_actions.append({
+                "action": "increase_difficulty",
+                "target": "harder",
+                "reason": "knowledge_mastery above 85, ready for advanced material",
+            })
 
         # 应用间隔重复策略
         if knowledge_mastery < 70:
@@ -361,6 +464,11 @@ class EvalAgent:
                 LearningStrategy.SPACED_REPETITION, {}
             )
             strategy_signals["review_intervals"] = strategy_context.get("review_intervals", [1, 3, 7, 14, 30])
+            next_actions.append({
+                "action": "add_review_nodes",
+                "reason": "knowledge_mastery below 70, spaced repetition recommended",
+                "intervals_days": strategy_signals["review_intervals"],
+            })
 
         # 应用费曼学习法
         if knowledge_mastery < 60:
@@ -369,6 +477,10 @@ class EvalAgent:
             )
             strategy_signals["feynman_suggested"] = True
             strategy_signals["teaching_approach"] = strategy_context.get("teaching_approach", "")
+            next_actions.append({
+                "action": "apply_feynman_technique",
+                "reason": "knowledge_mastery below 60, simplify explanations needed",
+            })
 
         # 应用主动回忆策略
         if engagement < 60:
@@ -376,7 +488,19 @@ class EvalAgent:
                 LearningStrategy.ACTIVE_RECALL, {}
             )
             strategy_signals["recall_suggested"] = True
+            next_actions.append({
+                "action": "add_practice_nodes",
+                "reason": "engagement below 60, active recall practice needed",
+            })
 
+        # 节奏调整
+        if consistency < 50:
+            next_actions.append({
+                "action": "reduce_pace",
+                "reason": "consistency below 50, slow down to build regular habits",
+            })
+
+        strategy_signals["next_actions"] = next_actions
         return strategy_signals
 
     async def _save_evaluation(
@@ -388,6 +512,7 @@ class EvalAgent:
     ) -> Evaluation:
         """保存评估到数据库"""
         async with async_session_factory() as db:
+            meta = evaluation.get("_meta", {})
             eval_record = Evaluation(
                 user_id=user_id,
                 course_id=course_id,
@@ -397,12 +522,30 @@ class EvalAgent:
                 report_data={
                     "generated_at": datetime.now(timezone.utc).isoformat(),
                     "dimensions": list(evaluation.get("scores", {}).keys()),
-                    "method": "llm_hybrid",
+                    "method": meta.get("source", "unknown"),
+                    "provider": meta.get("provider"),
+                    "model": meta.get("model"),
+                    "usage": meta.get("usage", {}),
+                    "llm_error": meta.get("error"),
+                    "llm_output_preview": meta.get("raw_preview"),
                 },
             )
             db.add(eval_record)
             await db.commit()
             await db.refresh(eval_record)
+            await EventService.emit(
+                user_id=user_id,
+                course_id=course_id,
+                event_type=EventType.EVALUATION_GENERATED,
+                source_agent="EvalAgent",
+                target_type="evaluation",
+                target_id=eval_record.id,
+                payload={
+                    "scores": evaluation.get("scores", {}),
+                    "suggestion_count": len(evaluation.get("suggestions", [])),
+                    "strategy_signals": strategy_signals,
+                },
+            )
             return eval_record
 
     def _build_message(self, evaluation: dict, strategy_signals: dict) -> str:

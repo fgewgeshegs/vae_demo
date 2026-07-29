@@ -13,6 +13,7 @@ from app.models.qa_record import QARecord
 from app.schemas.qa_record import QARecordCreate, QARecordResponse
 from app.agents.qa_agent import QAAgent
 from app.services.behavior_service import BehaviorService, ActionType
+from app.services.event_service import EventService, EventType
 
 router = APIRouter()
 
@@ -51,12 +52,19 @@ async def ask_question(
     answer = agent_result.get("answer", "")
 
     # 保存记录
+    qa_metadata = dict(data.metadata or {})
+    qa_metadata.update({
+        "provider": agent_result.get("provider"),
+        "retrieval_method": agent_result.get("retrieval_method"),
+        "sources": agent_result.get("sources", []),
+    })
+
     record = QARecord(
         user_id=current_user.id,
         course_id=data.course_id,
         question=data.question,
         answer=answer,
-        qa_metadata=data.metadata,
+        qa_metadata=qa_metadata,
     )
     db.add(record)
     await db.flush()
@@ -70,6 +78,20 @@ async def ask_question(
         target_type="qa_record",
         target_id=record.id,
         metadata={"course_id": data.course_id},
+    )
+    await EventService.emit(
+        user_id=current_user.id,
+        course_id=data.course_id,
+        event_type=EventType.QA_ANSWERED,
+        source_agent="QAAgent",
+        target_type="qa_record",
+        target_id=record.id,
+        payload={
+            "question": data.question,
+            "provider": agent_result.get("provider"),
+            "retrieval_method": agent_result.get("retrieval_method"),
+            "source_count": len(agent_result.get("sources", [])),
+        },
     )
 
     return QARecordResponse.model_validate(record)

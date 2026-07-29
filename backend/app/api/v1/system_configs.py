@@ -7,10 +7,11 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.database import get_db
-from app.core.security import get_current_user
+from app.core.security import require_admin
 from app.models.user import User
 from app.models.system_config import SystemConfig
 from app.schemas.system_config import SystemConfigCreate, SystemConfigResponse
+from app.core.config import apply_runtime_config
 
 router = APIRouter()
 
@@ -18,7 +19,7 @@ router = APIRouter()
 @router.get("/", response_model=list[SystemConfigResponse])
 async def list_configs(
     db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(require_admin),
 ):
     """获取所有配置"""
     result = await db.execute(
@@ -41,7 +42,7 @@ async def update_config(
     config_key: str,
     data: SystemConfigCreate,
     db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(require_admin),
 ):
     """更新配置（热生效）"""
     result = await db.execute(
@@ -50,24 +51,32 @@ async def update_config(
     config = result.scalar_one_or_none()
 
     if config:
+        if config.is_secret and data.config_value == "********":
+            raise HTTPException(status_code=400, detail="Masked secret cannot be saved")
         config.config_value = data.config_value
         if data.description:
             config.description = data.description
     else:
-        config = SystemConfig(**data.model_dump())
+        values = data.model_dump()
+        values["config_key"] = config_key
+        config = SystemConfig(**values)
         db.add(config)
 
     await db.flush()
     await db.commit()
     await db.refresh(config)
-    return SystemConfigResponse.model_validate(config)
+    apply_runtime_config(config_key, config.config_value)
+    response = SystemConfigResponse.model_validate(config)
+    if config.is_secret and response.config_value:
+        response.config_value = "********"
+    return response
 
 
 @router.get("/{config_key}", response_model=SystemConfigResponse)
 async def get_config(
     config_key: str,
     db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(require_admin),
 ):
     """获取配置项"""
     result = await db.execute(
