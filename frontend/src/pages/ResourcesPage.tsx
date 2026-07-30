@@ -123,7 +123,7 @@ const ResourcesPage: React.FC = () => {
                   key={resource.id}
                   hoverable
                   onClick={() => openResource(resource)}
-                  styles={{ body: { padding: 20, minHeight: 210, display: 'flex', flexDirection: 'column' } }}
+                  styles={{ body: { padding: 20, minHeight: 166, display: 'flex', flexDirection: 'column' } }}
                   style={{ height: '100%', borderColor: '#E3E8EF' }}
                 >
                   <div style={{
@@ -142,9 +142,6 @@ const ResourcesPage: React.FC = () => {
                   </div>
                   <Paragraph strong ellipsis={{ rows: 2 }} style={{ color: '#172033', fontSize: 16, lineHeight: 1.45, margin: '14px 0 0' }}>
                     {resource.title}
-                  </Paragraph>
-                  <Paragraph type="secondary" ellipsis={{ rows: 2 }} style={{ fontSize: 13, lineHeight: 1.6, margin: '8px 0 0' }}>
-                    {resource.content?.replace(/\s+/g, ' ') || previewContent(resource)}
                   </Paragraph>
                   <div style={{ alignItems: 'center', display: 'flex', gap: 8, marginTop: 'auto', paddingTop: 16 }}>
                     <Tag color={resource.resource_type === 'video' ? 'purple' : 'blue'} style={{ margin: 0 }}>{typeLabels[resource.resource_type]}</Tag>

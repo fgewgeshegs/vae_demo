@@ -1,0 +1,25 @@
+.catalogue-backdrop { position: absolute; inset: 0; z-index: 20; border: 0; background: transparent; cursor: default; }
+
+.course-catalogue { position: absolute; z-index: 21; top: 12px; bottom: 12px; left: 16px; width: clamp(340px, 24vw, 400px); max-width: calc(100% - 32px); overflow-y: auto; background: #fff; border: 1px solid #dfe4ea; border-radius: 8px; box-shadow: 0 8px 20px rgba(23, 35, 59, 0.16), 0 2px 5px rgba(23, 35, 59, 0.08); }
+.course-catalogue__loading { display: grid; min-height: 160px; place-items: center; }
+.catalogue-chapter { border-bottom: 1px solid #e4e8ee; }
+.catalogue-chapter:last-child { border-bottom: 0; }
+.catalogue-chapter__row { display: flex; min-height: 64px; align-items: center; padding-left: 18px; }
+.catalogue-chapter__title, .catalogue-chapter__toggle, .catalogue-lesson { font-family: inherit; text-align: left; border: 0; background: transparent; cursor: pointer; }
+.catalogue-chapter__title { flex: 1; min-width: 0; overflow: hidden; color: #17233b; font-size: 16px; line-height: 24px; white-space: nowrap; text-overflow: ellipsis; }
+.catalogue-chapter__title:hover { color: #2858d7; }
+.catalogue-chapter__title--active { font-weight: 700; }
+.catalogue-chapter__toggle { display: grid; width: 54px; height: 64px; place-items: center; color: #1f2937; font-size: 17px; }
+.catalogue-chapter__toggle:hover, .catalogue-chapter__toggle:focus-visible { color: #2858d7; outline: none; }
+.catalogue-chapter__lessons { padding: 4px 0 10px; background: #f7f8fa; }
+.catalogue-lesson { display: block; width: 100%; min-height: 40px; padding: 8px 18px; color: #929aa6; font-size: 14px; line-height: 24px; }
+.catalogue-lesson:hover, .catalogue-lesson:focus-visible { color: #2858d7; background: #eef3ff; outline: none; }
+.catalogue-lesson--active { color: #10a58a; font-weight: 500; }
+.learning-path-toolbar__catalogue-trigger.ant-btn { height: 36px; padding-inline: 10px; color: #28364d; font-weight: 600; }
+.learning-path-toolbar__catalogue-trigger.ant-btn:hover { color: #2858d7; background: #edf2ff; }
+
+@media (max-width: 720px) {
+  .course-catalogue { left: 8px; top: 8px; bottom: 8px; width: calc(100% - 16px); }
+  .catalogue-chapter__row { min-height: 56px; }
+  .catalogue-chapter__toggle { width: 48px; height: 56px; }
+}

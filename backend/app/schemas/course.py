@@ -1,14 +1,15 @@
-"""课程与章节 Pydantic Schemas"""
+﻿"""璇剧▼涓庣珷鑺?Pydantic Schemas"""
 
 from __future__ import annotations
 
 from datetime import datetime
 from pydantic import BaseModel, Field, ConfigDict
+from app.schemas.knowledge_point import KnowledgePointResponse
 
 
 class CourseCreate(BaseModel):
-    title: str = Field(..., max_length=200, description="课程标题")
-    description: str | None = Field(None, description="课程描述")
+    title: str = Field(..., max_length=200, description="璇剧▼鏍囬")
+    description: str | None = Field(None, description="璇剧▼鎻忚堪")
     cover_url: str | None = None
     seed_course: bool = False
 
@@ -42,5 +43,6 @@ class ChapterResponse(BaseModel):
     sort_order: int
     created_at: datetime
     updated_at: datetime
+    knowledge_points: list[KnowledgePointResponse] = Field(default_factory=list)
 
     model_config = ConfigDict(from_attributes=True)

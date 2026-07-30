@@ -1,4 +1,4 @@
-import axios, { AxiosError, InternalAxiosRequestConfig } from "axios"
+﻿import axios, { AxiosError, InternalAxiosRequestConfig } from "axios"
 import type {
   TokenResponse,
   Course,
@@ -16,6 +16,8 @@ import type {
   ChapterPlan,
   TaskProgress,
   DashboardOverview,
+  LearningFeedback,
+  LearningRun,
 } from "../types"
 
 const api = axios.create({
@@ -118,6 +120,11 @@ export const resourceApi = {
   list: (params?: { course_id?: number; resource_type?: string; chapter_id?: number; knowledge_point_id?: number }) =>
     api.get<LearningResource[]>("/resources/", { params }),
   get: (id: number) => api.get<LearningResource>(`/resources/${id}`),
+  recommendCurrentTask: (pathId: number, nodeId: string) =>
+    api.get<{ state_snapshot_id: string; planning_reasons: string[]; resources: LearningResource[] }>(
+      "/resources/recommendations/current",
+      { params: { path_id: pathId, node_id: nodeId } },
+    ),
 }
 
 // ========== 章节学习计划 API ==========
@@ -130,6 +137,21 @@ export const chapterPlanApi = {
     completeTask: (chapterId: number, taskId: string) =>
       api.post(`/chapter-plans/${chapterId}/tasks/${taskId}/complete`),
   }
+
+// ========== Deterministic chapter learning loop API ==========
+export const learningRunApi = {
+  create: (chapterId: number) => api.post<LearningRun>('/learning-runs/', { chapter_id: chapterId, plan_version: 1, personalization_snapshot: {} }),
+  get: (runId: number) => api.get<LearningRun>(`/learning-runs/${runId}`),
+  completeLearning: (runId: number, evidence: Record<string, unknown> = {}) =>
+    api.post(`/learning-runs/${runId}/learning-completions`, { evidence }),
+  completePractice: (runId: number, evidence: Record<string, unknown> = {}) =>
+    api.post(`/learning-runs/${runId}/practice-completions`, { evidence }),
+  addPracticeAttempt: (runId: number, data: { knowledge_point_id: number; is_correct?: boolean; viewed_explanation?: boolean; misconception_tags?: string[] }) =>
+    api.post(`/learning-runs/${runId}/practice-attempts`, data),
+  submitAssessment: (runId: number, data: { submission_key: string; items: Array<{ item_id: string; knowledge_point_id: number; is_correct: boolean; score: number }> }) =>
+    api.post<LearningFeedback>(`/learning-runs/${runId}/assessments`, data),
+  feedback: (runId: number) => api.get<LearningFeedback>(`/learning-runs/${runId}/feedback`),
+}
 
 // ========== 学习路径 API ==========
 export const studyPathApi = {

@@ -11,9 +11,36 @@ from app.core.security import get_current_user
 from app.models.user import User
 from app.models.learning_resource import LearningResource
 from app.schemas.learning_resource import LearningResourceCreate, LearningResourceResponse, ResourceType
+from app.services.personalization import PersonalizationService
 
 router = APIRouter()
 SHARED_RESOURCE_USER_ID = 1
+
+
+@router.get("/recommendations/current")
+async def recommend_current_task_resources(
+    path_id: int,
+    node_id: str,
+    current_user: User = Depends(get_current_user),
+):
+    """Return ranked, explainable resources for one node of the active path."""
+    try:
+        result = await PersonalizationService().recommend_current_task(
+            current_user.id, path_id, node_id,
+        )
+    except LookupError as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
+    return {
+        **result,
+        "resources": [
+            {
+                **LearningResourceResponse.model_validate(item["resource"]).model_dump(),
+                "recommendation_rank": item["rank"],
+                "recommendation_reason": item["reason"],
+            }
+            for item in result["resources"]
+        ],
+    }
 
 
 @router.get("/", response_model=list[LearningResourceResponse])

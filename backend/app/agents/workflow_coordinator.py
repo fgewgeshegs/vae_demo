@@ -15,6 +15,7 @@ from app.models.evaluation import Evaluation
 from app.models.learning_task import LearningTask
 from app.models.student_profile import StudentProfile
 from app.models.study_path import StudyPath
+from app.services.personalization import PersonalizationService
 
 StepEmitter = Callable[[dict[str, Any]], Awaitable[None]]
 
@@ -172,6 +173,8 @@ class WorkflowCoordinator:
         if not failed:
             await self._emit(emit_step, "save_result", "running", "正在保存结果")
             await self._emit(emit_step, "save_result", "done", "结果已保存")
+            if task.course_id:
+                await PersonalizationService().replan_active_path(task.user_id, task.course_id)
         return {
             "status": "failed" if failed else "succeeded",
             "type": result.get("type", "profile_updated"),
@@ -214,6 +217,8 @@ class WorkflowCoordinator:
         if not failed:
             await self._emit(emit_step, "save_result", "running", "正在保存结果")
             await self._emit(emit_step, "save_result", "done", "结果已保存")
+            if task.course_id:
+                await PersonalizationService().replan_active_path(task.user_id, task.course_id)
         return {
             "status": "failed" if failed else "succeeded",
             "type": result.get("type", "eval"),

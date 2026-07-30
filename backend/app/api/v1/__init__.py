@@ -2,7 +2,10 @@ from fastapi import APIRouter
 
 from app.api.v1 import auth, users, courses, chapters, knowledge_points, documents, resources, study_paths, qa, evaluations, system_configs, search, behaviors, chat, tasks, videos, profile_conversation, chapter_plans, dashboard
 
+from app.api.v1 import learning_runs
+
 v1_router = APIRouter(prefix="/api/v1")
+v1_router.include_router(learning_runs.router, prefix="/learning-runs", tags=["Chapter learning loop"])
 v1_router.include_router(dashboard.router, prefix="/dashboard", tags=["Dashboard"])
 
 v1_router.include_router(auth.router, prefix="/auth", tags=["认证"])

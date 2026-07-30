@@ -124,7 +124,7 @@ const AppLayout: React.FC = () => {
               <span>{user?.display_name || user?.username || '学习者'}</span>
             </button>
           </header>
-          <Content className={`workspace-content ${location.pathname === '/dashboard' ? 'workspace-content--dashboard' : 'workspace-content--workspace'} ${location.pathname === '/qa' ? 'workspace-content--qa' : ''}`}>
+          <Content className={`workspace-content ${location.pathname === '/dashboard' ? 'workspace-content--dashboard' : 'workspace-content--workspace'} ${location.pathname === '/qa' ? 'workspace-content--qa' : ''} ${location.pathname === '/path' ? 'workspace-content--learning-path' : ''}`}>
             <div className="fade-in"><Outlet /></div>
           </Content>
         </Layout>

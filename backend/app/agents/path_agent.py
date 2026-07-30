@@ -18,6 +18,7 @@ from app.agents.resource_agent import ResourceCoordinator
 from app.services.event_service import EventService, EventType
 from app.services.learning_strategies import LearningStrategyEngine, LearningStrategy
 from app.services.student_state import StudentStateService
+from app.services.personalization import PersonalizationService
 from loguru import logger
 
 SHARED_RESOURCE_USER_ID = 1
@@ -527,6 +528,12 @@ class PathAgent:
         })
 
         # 5. 计算总时间
+        chapter_reasons = PersonalizationService.profile_reason(
+            profile,
+            {"type": "learn", "title": chapter_title},
+        )
+        for task in tasks:
+            task["personalization_reason"] = list(chapter_reasons)
         estimated_total = sum(task.get("estimated_minutes", 0) for task in tasks)
 
         # 6. 构建计划说明
@@ -718,6 +725,13 @@ class PathAgent:
             )
 
         nodes = self._normalize_nodes(nodes, course_context=course_context)
+        # Persist the reasoning with every node so the UI can explain the path
+        # without asking the model again on every page view.
+        personalizer = PersonalizationService()
+        for node in nodes:
+            node["recommended_resource_types"] = personalizer.preferred_types(profile_data, node)
+            node["personalization_reason"] = personalizer.profile_reason(profile_data, node)
+            node["state_snapshot_id"] = student_state["snapshot_id"]
         estimated_total = sum(node.get("estimated_minutes", 0) for node in nodes)
 
         async with async_session_factory() as db:
@@ -745,6 +759,12 @@ class PathAgent:
                     "strategies_applied": [strategy.value for strategy in strategies],
                     "student_state_snapshot_id": student_state["snapshot_id"],
                     "profile_version": student_state["profile"]["version"],
+                    "planning_basis": {
+                        "level": level,
+                        "preference": profile_data.get("cognitive_style", {}).get("preference", ""),
+                        "knowledge_gaps": profile_data.get("knowledge_gaps", []) or profile_data.get("weak_points", []),
+                        "latest_evaluation_id": (latest_evaluation or {}).get("id"),
+                    },
                 },
                 progress=0.0,
                 is_active=True,

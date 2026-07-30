@@ -81,6 +81,8 @@ export interface LearningResource {
   metadata: Record<string, unknown> | null
   is_generated: boolean
   created_at: string
+  recommendation_rank?: number
+  recommendation_reason?: string
 }
 
 /** 画像 */
@@ -116,6 +118,10 @@ export interface StudyPath {
     description?: string
     estimated_total_minutes?: number
     strategies_applied?: string[]
+    student_state_snapshot_id?: string
+    profile_version?: number
+    planning_basis?: { level?: string; preference?: string; knowledge_gaps?: string[]; latest_evaluation_id?: number }
+    adjustment_summary?: string
   }
   progress: number
   is_active: boolean
@@ -138,6 +144,9 @@ export interface StudyPathNode {
   status: 'pending' | 'in_progress' | 'completed'
   estimated_minutes: number
   completed_at?: string
+  recommended_resource_types?: string[]
+  personalization_reason?: string[]
+  state_snapshot_id?: string
 }
 
 /** 问答记录 */
@@ -303,4 +312,34 @@ export interface TaskProgress {
   status: string
   correct_rate?: number
   score?: number
+}
+
+/** Deterministic five-stage chapter learning loop. */
+export interface LearningRunStage {
+  stage: 'learn' | 'practice' | 'assess' | 'feedback' | 'review' | 'remedial'
+  status: 'locked' | 'available' | 'active' | 'completed'
+  evidence: Record<string, unknown>
+  started_at: string | null
+  completed_at: string | null
+}
+
+export interface LearningRun {
+  id: number
+  chapter_id: number
+  status: 'locked' | 'active' | 'completed'
+  current_stage: 'locked' | LearningRunStage['stage']
+  plan_version: number
+  personalization_snapshot: Record<string, unknown>
+  lock_reason: { reason_code?: string; blocked_by?: number[]; unlock_condition?: string } | null
+  stages: LearningRunStage[]
+  started_at: string | null
+  completed_at: string | null
+}
+
+export interface LearningFeedback {
+  assessment_attempt_id: number
+  result: 'partial_mastery' | 'mastered'
+  mastered: Array<{ knowledge_point_id: number; mastery: number }>
+  weak: Array<{ knowledge_point_id: number; mastery: number }>
+  next_action: { type: 'review' | 'remedial'; reason: string }
 }

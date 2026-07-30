@@ -1,9 +1,9 @@
-"""章节学习计划 API"""
+﻿"""章节学习计划 API"""
 
 from __future__ import annotations
 
 from fastapi import APIRouter, Depends, HTTPException
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
@@ -13,7 +13,7 @@ from app.core.security import get_current_user
 from app.models.user import User
 from app.models.course import Chapter
 from app.services.student_state import StudentStateService
-from app.agents.path_agent import PathAgent
+from app.services.personalization import PersonalizationService
 
 router = APIRouter()
 
@@ -30,6 +30,7 @@ class ChapterTask(BaseModel):
     estimated_minutes: float
     resource_types: list[str]
     difficulty: str = "medium"
+    personalization_reason: list[str] = Field(default_factory=list)
 
 
 class ChapterPlanResponse(BaseModel):
@@ -89,16 +90,6 @@ async def _get_chapter_or_404(chapter_id: int, db: AsyncSession) -> Chapter:
     return chapter
 
 
-def _format_evaluation_context(evaluation: dict) -> str | None:
-    """将评估结果格式化为上下文字符串"""
-    if "error" in evaluation:
-        return None
-    suggestions = evaluation.get("suggestions", [])
-    if suggestions:
-        return "评估建议：" + "；".join(suggestions)
-    return None
-
-
 # ── Endpoints ──
 
 
@@ -108,73 +99,76 @@ async def get_chapter_plan(
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
-    """获取章节学习计划"""
+    """获取章节学习计划——确定性结构：每个知识点 → 学习+练习，然后章节检测+复习"""
     chapter = await _get_chapter_or_404(chapter_id, db)
-    course_id = chapter.course_id
+    kps = sorted(chapter.knowledge_points, key=lambda kp: kp.sort_order)
 
-    # 获取学生画像
-    student_state = StudentStateService()
-    profile = await student_state.load(
-        user_id=current_user.id,
-        course_id=course_id,
-    )
-
-    # 获取评估上下文
-    evaluation = await student_state.evaluate_chapter_performance(
-        user_id=current_user.id,
-        course_id=course_id,
-        chapter_id=chapter_id,
-    )
-    evaluation_context = _format_evaluation_context(evaluation)
-
-    # 准备章节信息
-    chapter_info = {
-        "title": chapter.title,
-        "knowledge_points": [
-            {
-                "title": kp.title,
-                "difficulty": kp.difficulty or "medium",
-            }
-            for kp in chapter.knowledge_points
-        ],
-    }
-
-    # 生成学习计划
-    path_agent = PathAgent()
-    plan = await path_agent.generate_chapter_learning_plan(
-        chapter_info=chapter_info,
-        profile=profile,
-        evaluation_context=evaluation_context,
-    )
-
-    # 标准化任务数据并分配 task_id
-    tasks = plan.get("tasks", [])
     normalized_tasks: list[dict] = []
-    for i, task in enumerate(tasks):
+
+    # 每个知识点：学习 + 练习
+    for i, kp in enumerate(kps):
         normalized_tasks.append({
-            "task_id": f"ch{chapter_id}_task_{i + 1}",
-            "task_type": task.get("task_type") or task.get("type", "learn"),
-            "title": task.get("title", ""),
-            "description": task.get("description", ""),
-            "estimated_minutes": task.get("estimated_minutes", 0),
-            "resource_types": task.get("resource_types", ["document"]),
-            "difficulty": task.get("difficulty", "medium"),
+            "task_id": f"ch{chapter_id}_learn_{kp.id}",
+            "task_type": "learn",
+            "title": f"学习：{kp.title}",
+            "description": kp.content or f"学习本章节核心概念：{kp.title}",
+            "estimated_minutes": 15,
+            "resource_types": ["document", "mindmap", "reading"],
+            "difficulty": kp.difficulty or "medium",
+            "personalization_reason": [],
+        })
+        normalized_tasks.append({
+            "task_id": f"ch{chapter_id}_practice_{kp.id}",
+            "task_type": "practice",
+            "title": f"练习：{kp.title}",
+            "description": f"完成 {kp.title} 的针对性练习，巩固理解",
+            "estimated_minutes": 10,
+            "resource_types": ["exercise"],
+            "difficulty": kp.difficulty or "medium",
+            "personalization_reason": [],
         })
 
+    # 章节总检测（计分）
+    normalized_tasks.append({
+        "task_id": f"ch{chapter_id}_assessment",
+        "task_type": "assessment",
+        "title": f"章节检测：{chapter.title}",
+        "description": f"基于本章全部 {len(kps)} 个知识点的综合检测，计分",
+        "estimated_minutes": 15,
+        "resource_types": ["exercise"],
+        "difficulty": "medium",
+        "personalization_reason": [],
+    })
+
+    # 章节复习
+    normalized_tasks.append({
+        "task_id": f"ch{chapter_id}_review",
+        "task_type": "review",
+        "title": f"章节复习：{chapter.title}",
+        "description": "回顾本章全部知识点，梳理知识框架，查漏补缺",
+        "estimated_minutes": 10,
+        "resource_types": ["document", "mindmap"],
+        "difficulty": "medium",
+        "personalization_reason": [],
+    })
+
+    total_minutes = sum(t["estimated_minutes"] for t in normalized_tasks)
+    description = f"本章共 {len(kps)} 个知识点，{len(normalized_tasks)} 项任务，预计 {total_minutes} 分钟"
+
     # 初始化任务跟踪
-    if normalized_tasks:
-        await student_state.track_chapter_task_progress(
-            user_id=current_user.id,
-            course_id=course_id,
-            chapter_id=chapter_id,
-            tasks=normalized_tasks,
-        )
+    student_state = StudentStateService()
+    await student_state.track_chapter_task_progress(
+        user_id=current_user.id,
+        course_id=chapter.course_id,
+        chapter_id=chapter_id,
+        tasks=normalized_tasks,
+    )
 
     return ChapterPlanResponse(
         chapter_id=chapter_id,
         tasks=[ChapterTask(**t) for t in normalized_tasks],
-        estimated_total_minutes=plan.get("estimated_total_minutes", 0),
-        description=plan.get("description", ""),
+        estimated_total_minutes=total_minutes,
+        description=description,
     )
 
 
@@ -202,6 +196,14 @@ async def complete_task(
 
     if "error" in result:
         raise HTTPException(status_code=400, detail=result["error"])
+
+    adaptation = await PersonalizationService().replan_active_path(
+        current_user.id,
+        course_id,
+        correct_rate=data.correct_rate,
+    )
+    if adaptation:
+        result["path_adjustment"] = adaptation
 
     return TaskCompletionResponse(
         success=result.get("success", False),

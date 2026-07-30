@@ -11,6 +11,16 @@ from app.models.evaluation import Evaluation
 from app.models.system_config import SystemConfig
 from app.models.learning_task import LearningTask
 from app.models.learning_event import LearningEvent
+from app.models.learning_run import (
+    AssessmentAttempt,
+    AssessmentItemResult,
+    ChapterLearningRun,
+    ChapterLearningStage,
+    KnowledgePointDependency,
+    KnowledgePointMastery,
+    MasteryHistory,
+    PracticeAttempt,
+)
 
 __all__ = [
     "User",
@@ -28,4 +38,12 @@ __all__ = [
     "SystemConfig",
     "LearningTask",
     "LearningEvent",
+    "ChapterLearningRun",
+    "ChapterLearningStage",
+    "KnowledgePointDependency",
+    "KnowledgePointMastery",
+    "MasteryHistory",
+    "PracticeAttempt",
+    "AssessmentAttempt",
+    "AssessmentItemResult",
 ]

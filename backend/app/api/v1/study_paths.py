@@ -12,6 +12,7 @@ from app.models.user import User
 from app.models.study_path import StudyPath
 from app.schemas.study_path import StudyPathResponse, StudyPathUpdate
 from app.services.event_service import EventService, EventType
+from app.services.personalization import PersonalizationService
 
 router = APIRouter()
 
@@ -104,4 +105,12 @@ async def update_study_path(
                 "progress": path.progress,
             },
         )
+    # A completed node is a new learning signal.  Keep completed nodes intact
+    # and refresh the state snapshot used by all remaining recommendations.
+    if newly_completed:
+        await PersonalizationService().replan_active_path(
+            current_user.id,
+            path.course_id,
+        )
+        await db.refresh(path)
     return StudyPathResponse.model_validate(path)

@@ -7,9 +7,10 @@ interface WorkspacePageHeaderProps {
   description?: React.ReactNode
   actions?: React.ReactNode
   metrics?: PageMetric[]
+  metricAction?: React.ReactNode
 }
 
-const WorkspacePageHeader: React.FC<WorkspacePageHeaderProps> = ({ title, description, actions, metrics }) => (
+const WorkspacePageHeader: React.FC<WorkspacePageHeaderProps> = ({ title, description, actions, metrics, metricAction }) => (
   <section className="workspace-page-header">
     <div className="workspace-page-header__main">
       <h1>{title}</h1>
@@ -20,6 +21,7 @@ const WorkspacePageHeader: React.FC<WorkspacePageHeaderProps> = ({ title, descri
       {metrics.map((metric) => <div className="workspace-page-header__metric" key={metric.label}>
         <span>{metric.label}</span><strong>{metric.value}</strong>
       </div>)}
+      {metricAction && <div className="workspace-page-header__metric-action">{metricAction}</div>}
     </div>}
   </section>
 )

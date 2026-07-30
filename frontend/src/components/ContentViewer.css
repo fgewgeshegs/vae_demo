@@ -1,0 +1,11 @@
+.learning-step-viewer { display: flex; height: 100%; min-width: 0; flex-direction: column; overflow: hidden; background: #fff; }
+.learning-step-viewer__scroll { min-height: 0; flex: 1; overflow-y: auto; }
+.learning-step-viewer__content { margin: 0 auto; max-width: 980px; padding: 24px 32px 36px; }
+.learning-step-resources { display: grid; gap: 10px; }
+.learning-step-resource { cursor: pointer; }
+.learning-step-pagination { display: grid; min-height: 72px; flex-shrink: 0; grid-template-columns: 64px minmax(0, 1fr) 64px; align-items: center; border-top: 1px solid #e6ebf2; background: #fff; box-shadow: 0 -6px 14px rgba(15, 23, 42, 0.04); }
+.learning-step-pagination__arrow.ant-btn { justify-self: center; width: 44px; height: 44px; color: #344054; font-size: 22px; }
+.learning-step-pagination__pages { display: flex; justify-content: center; gap: 14px; overflow-x: auto; padding: 8px; }
+.learning-step-pagination__page.ant-btn { width: 34px; min-width: 34px; height: 34px; padding: 0; border-color: #c8d0dd; color: #475467; background: #fff; }
+.learning-step-pagination__page.ant-btn:hover, .learning-step-pagination__page--active.ant-btn { border-color: #2563eb; color: #2563eb; background: #eff6ff; }
+@media (max-width: 720px) { .learning-step-viewer__content { padding: 20px 16px 28px; } .learning-step-pagination { grid-template-columns: 52px minmax(0, 1fr) 52px; } .learning-step-pagination__pages { gap: 8px; } }

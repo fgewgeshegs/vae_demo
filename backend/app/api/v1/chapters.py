@@ -1,4 +1,4 @@
-"""章节 API"""
+﻿"""绔犺妭 API"""
 
 from __future__ import annotations
 
@@ -24,11 +24,12 @@ async def list_chapters(
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
-    """获取课程的章节列表"""
+    """List the chapters in a course."""
     result = await db.execute(
         select(Chapter)
         .where(Chapter.course_id == course_id)
         .order_by(Chapter.sort_order)
+        .options(selectinload(Chapter.knowledge_points))
     )
     chapters = result.scalars().all()
     return [ChapterResponse.model_validate(c) for c in chapters]
@@ -40,7 +41,7 @@ async def get_chapter(
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
-    """获取章节详情"""
+    """Get chapter details."""
     result = await db.execute(
         select(Chapter)
         .where(Chapter.id == chapter_id)
@@ -48,7 +49,7 @@ async def get_chapter(
     )
     chapter = result.scalar_one_or_none()
     if not chapter:
-        raise HTTPException(status_code=404, detail="章节不存在")
+        raise HTTPException(status_code=404, detail="Chapter not found")
     return ChapterResponse.model_validate(chapter)
 
 
@@ -58,11 +59,11 @@ async def create_chapter(
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
-    """创建章节"""
-    # 验证课程存在
+    """鍒涘缓绔犺妭"""
+    # 楠岃瘉璇剧▼瀛樺湪
     course_result = await db.execute(select(Course).where(Course.id == data.course_id))
     if not course_result.scalar_one_or_none():
-        raise HTTPException(status_code=404, detail="课程不存在")
+        raise HTTPException(status_code=404, detail="Course not found")
 
     chapter = Chapter(**data.model_dump())
     db.add(chapter)
@@ -79,11 +80,11 @@ async def update_chapter(
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
-    """更新章节"""
+    """鏇存柊绔犺妭"""
     result = await db.execute(select(Chapter).where(Chapter.id == chapter_id))
     chapter = result.scalar_one_or_none()
     if not chapter:
-        raise HTTPException(status_code=404, detail="章节不存在")
+        raise HTTPException(status_code=404, detail="Chapter not found")
 
     for key, value in data.model_dump(exclude_unset=True).items():
         setattr(chapter, key, value)
@@ -99,10 +100,10 @@ async def delete_chapter(
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
-    """删除章节"""
+    """Delete a chapter."""
     result = await db.execute(select(Chapter).where(Chapter.id == chapter_id))
     chapter = result.scalar_one_or_none()
     if not chapter:
-        raise HTTPException(status_code=404, detail="章节不存在")
+        raise HTTPException(status_code=404, detail="Chapter not found")
     await db.delete(chapter)
     await db.commit()
