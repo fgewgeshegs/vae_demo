@@ -40,6 +40,12 @@ class PersonalizationService:
 
     @staticmethod
     def preferred_types(profile: dict[str, Any], node: dict[str, Any]) -> list[str]:
+        explicit_types = profile.get("resource_preferences", {}).get("types", [])
+        if isinstance(explicit_types, list):
+            selected = [item for item in explicit_types if item in RESOURCE_LABELS]
+            if selected:
+                return selected
+
         preference = str(profile.get("cognitive_style", {}).get("preference", "")).lower()
         ordered = ["document"]
         if any(word in preference for word in ("视觉", "visual", "听觉", "auditory")):

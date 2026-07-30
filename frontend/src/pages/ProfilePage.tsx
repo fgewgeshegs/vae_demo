@@ -62,6 +62,19 @@ const PREFERENCE_OPTIONS = [
   { label: "混合", value: "mixed" },
 ]
 
+const RESOURCE_TYPE_OPTIONS = [
+  { label: "讲义", value: "document" },
+  { label: "教学视频", value: "video" },
+  { label: "练习题", value: "exercise" },
+  { label: "代码案例", value: "code" },
+  { label: "思维导图", value: "mindmap" },
+  { label: "拓展阅读", value: "reading" },
+]
+
+const RESOURCE_TYPE_LABELS = Object.fromEntries(
+  RESOURCE_TYPE_OPTIONS.map(({ label, value }) => [value, label])
+)
+
 const LEVEL_LABELS: Record<string, string> = { beginner: '入门', intermediate: '中等', advanced: '进阶' }
 const PREFERENCE_LABELS: Record<string, string> = { visual: '视觉化学习', auditory: '听讲学习', reading: '阅读学习', kinesthetic: '实践学习', mixed: '混合学习' }
 const SPEED_LABELS: Record<string, string> = { slow: '循序渐进', normal: '适中', fast: '快速推进' }
@@ -116,6 +129,7 @@ const ProfilePage: React.FC = () => {
     speed: "",
     sessionMinutes: 30,
     interestAreas: [] as string[],
+    resourceTypes: [] as string[],
   })
 
   const fetchProfile = async () => {
@@ -158,6 +172,7 @@ const ProfilePage: React.FC = () => {
       speed: ((pd.learning_pace as any)?.speed as string) || "",
       sessionMinutes: ((pd.learning_pace as any)?.preferred_session_minutes as number) || 30,
       interestAreas: ((pd.interest_direction as any)?.areas as string[]) || [],
+      resourceTypes: ((pd.resource_preferences as any)?.types as string[]) || [],
     })
     setEditing(true)
   }
@@ -173,6 +188,7 @@ const ProfilePage: React.FC = () => {
         learning_goals: { short_term: form.shortTermGoal || null, long_term: form.longTermGoal || null },
         learning_pace: { speed: form.speed || null, preferred_session_minutes: form.sessionMinutes },
         interest_direction: { areas: form.interestAreas.length > 0 ? form.interestAreas : null },
+        resource_preferences: { types: form.resourceTypes },
       })
       message.success("画像已保存")
       setEditing(false)
@@ -196,6 +212,7 @@ const ProfilePage: React.FC = () => {
   const pd = profile.profile_data
   const interestAreas = cleanProfileTags((pd.interest_direction as any)?.areas)
   const preferenceDescription = cleanProfileDescription((pd.cognitive_style as any)?.description)
+  const resourceTypes = (pd.resource_preferences as any)?.types as string[] || []
 
   return (
     <div className="workspace-page workspace-page--profile">
@@ -273,6 +290,12 @@ const ProfilePage: React.FC = () => {
                   <Text strong style={{ fontSize: 13, display: "block", marginBottom: 6 }}>描述</Text>
                   <Input.TextArea value={form.prefDesc} onChange={e => setForm(f => ({ ...f, prefDesc: e.target.value }))}
                     placeholder="描述你的学习偏好..." rows={2} />
+                </div>
+                <div style={{ marginTop: 16 }}>
+                  <Text strong style={{ fontSize: 13, display: "block", marginBottom: 6 }}>资源形式</Text>
+                  <Select mode="multiple" value={form.resourceTypes}
+                    onChange={v => setForm(f => ({ ...f, resourceTypes: v }))}
+                    placeholder="可多选偏好的资源形式" style={{ width: "100%" }} options={RESOURCE_TYPE_OPTIONS} />
                 </div>
               </Card>
             </Col>
@@ -368,6 +391,13 @@ const ProfilePage: React.FC = () => {
                 <Descriptions column={1} size="small">
                   <Descriptions.Item label="偏好"><Tag color="purple">{PREFERENCE_LABELS[((pd.cognitive_style as any)?.preference as string)] || "未设置"}</Tag></Descriptions.Item>
                   <Descriptions.Item label="描述">{preferenceDescription || "暂无"}</Descriptions.Item>
+                  <Descriptions.Item label="资源形式">
+                    {resourceTypes.length > 0 ? (
+                      <Space size={[6, 6]} wrap>
+                        {resourceTypes.map((type) => <Tag key={type} color="geekblue" style={{ margin: 0 }}>{RESOURCE_TYPE_LABELS[type] || type}</Tag>)}
+                      </Space>
+                    ) : "暂无"}
+                  </Descriptions.Item>
                 </Descriptions>
               </Card>
             </Col>

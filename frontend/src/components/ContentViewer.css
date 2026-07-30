@@ -1,8 +1,19 @@
 .learning-step-viewer { display: flex; height: 100%; min-width: 0; flex-direction: column; overflow: hidden; background: #fff; }
 .learning-step-viewer__scroll { min-height: 0; flex: 1; overflow-y: auto; }
-.learning-step-viewer__content { margin: 0 auto; max-width: 980px; padding: 24px 32px 36px; }
-.learning-step-resources { display: grid; gap: 10px; }
-.learning-step-resource { cursor: pointer; }
+.learning-step-viewer__content { margin: 0 auto; max-width: 820px; padding: 32px 40px 48px; }
+.learning-step-resources { display: grid; gap: 32px; }
+.learning-material { border-top: 1px solid #dce4ee; padding-top: 24px; }
+.learning-material__header { display: flex; justify-content: space-between; gap: 16px; align-items: flex-start; margin-bottom: 16px; }
+.learning-material__type { margin: 0 0 8px; color: #2956a3; border-color: #b8cff6; background: #eef5ff; }
+.learning-material__title.ant-typography { margin: 0; color: #172b4d; font-size: 18px; }
+.learning-material__content { color: #334155; font-size: 15px; line-height: 1.8; }
+.learning-material__content h1, .learning-material__content h2, .learning-material__content h3 { color: #172b4d; margin-top: 28px; }
+.learning-material__content p { margin: 0 0 16px; }
+.learning-material__content li { margin-bottom: 8px; }
+.learning-material__content pre { overflow-x: auto; padding: 16px; border-radius: 6px; background: #13223d; color: #e5efff; }
+.learning-material__content table { width: 100%; border-collapse: collapse; margin: 20px 0; }
+.learning-material__content th, .learning-material__content td { border: 1px solid #dce4ee; padding: 9px 12px; text-align: left; }
+.learning-material__content th { background: #f4f7fb; }
 .learning-step-pagination { display: grid; min-height: 72px; flex-shrink: 0; grid-template-columns: 64px minmax(0, 1fr) 64px; align-items: center; border-top: 1px solid #e6ebf2; background: #fff; box-shadow: 0 -6px 14px rgba(15, 23, 42, 0.04); }
 .learning-step-pagination__arrow.ant-btn { justify-self: center; width: 44px; height: 44px; color: #344054; font-size: 22px; }
 .learning-step-pagination__pages { display: flex; justify-content: center; gap: 14px; overflow-x: auto; padding: 8px; }

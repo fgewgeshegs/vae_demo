@@ -96,6 +96,7 @@ export interface StudentProfile {
     knowledge_gaps: string[]
     learning_pace: Record<string, unknown>
     interest_direction: Record<string, unknown>
+    resource_preferences?: Record<string, unknown>
     weak_points: string[]
     learning_habits?: Record<string, unknown>
     motivation_factors?: Record<string, unknown>

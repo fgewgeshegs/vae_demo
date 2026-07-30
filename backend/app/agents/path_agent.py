@@ -270,6 +270,78 @@ class PathAgent:
             )
         return normalized
 
+    @staticmethod
+    def _build_full_course_nodes(course_context: dict, profile: dict) -> list[dict]:
+        """Create an anchored path that covers every learning section in order.
+
+        Personalisation controls pace and recommended resources, not whether a
+        chapter or knowledge point is silently omitted from a full-course path.
+        """
+        level = profile.get("knowledge_base", {}).get("level", "beginner")
+        base_minutes = {"beginner": 30, "intermediate": 25, "advanced": 20}.get(level, 25)
+        nodes: list[dict] = []
+
+        for chapter_index, chapter in enumerate(course_context.get("chapters", []), start=1):
+            knowledge_points = chapter.get("knowledge_points", [])
+            if not knowledge_points:
+                continue
+
+            chapter_id = chapter.get("id")
+            chapter_title = chapter.get("title", f"Chapter {chapter_index}")
+            first_kp = knowledge_points[0]
+            last_kp = knowledge_points[-1]
+            nodes.append(
+                {
+                    "id": f"chapter-{chapter_id}-preview",
+                    "title": f"Chapter {chapter_index} preview: {chapter_title}",
+                    "type": "preview",
+                    "estimated_minutes": 8,
+                    "chapter_id": chapter_id,
+                    "knowledge_point_id": first_kp.get("id"),
+                    "chapter_title": chapter_title,
+                    "knowledge_point_title": first_kp.get("title"),
+                    "learning_content": first_kp.get("content"),
+                    "difficulty": "easy",
+                    "resource_ids": [],
+                    "coverage_role": "chapter_preview",
+                }
+            )
+            for knowledge_point in knowledge_points:
+                minutes = base_minutes + (5 if knowledge_point.get("difficulty") == "hard" else 0)
+                nodes.append(
+                    {
+                        "id": f"kp-{knowledge_point.get('id')}",
+                        "title": knowledge_point.get("title"),
+                        "type": "learn",
+                        "estimated_minutes": minutes,
+                        "chapter_id": chapter_id,
+                        "knowledge_point_id": knowledge_point.get("id"),
+                        "chapter_title": chapter_title,
+                        "knowledge_point_title": knowledge_point.get("title"),
+                        "learning_content": knowledge_point.get("content"),
+                        "difficulty": knowledge_point.get("difficulty", "medium"),
+                        "resource_ids": [],
+                        "coverage_role": "knowledge_point",
+                    }
+                )
+            nodes.append(
+                {
+                    "id": f"chapter-{chapter_id}-review",
+                    "title": f"Chapter {chapter_index} review: {chapter_title}",
+                    "type": "review",
+                    "estimated_minutes": 15,
+                    "chapter_id": chapter_id,
+                    "knowledge_point_id": last_kp.get("id"),
+                    "chapter_title": chapter_title,
+                    "knowledge_point_title": last_kp.get("title"),
+                    "learning_content": last_kp.get("content"),
+                    "difficulty": "medium",
+                    "resource_ids": [],
+                    "coverage_role": "chapter_review",
+                }
+            )
+        return nodes
+
     async def _attach_resources_to_nodes(
         self,
         *,
@@ -653,8 +725,7 @@ class PathAgent:
         latest_evaluation = student_state.get("latest_evaluation")
         evaluation_context = self._build_evaluation_context(latest_evaluation)
         strategies = self._apply_evaluation_strategies(strategies, latest_evaluation)
-        if latest_evaluation:
-            strategy_instructions = self.strategy_engine.build_strategy_prompt(strategies, strategy_context)
+        strategy_instructions = self.strategy_engine.build_strategy_prompt(strategies, strategy_context)
 
         try:
             prompt = PATH_GENERATION_PROMPT.format(
@@ -664,13 +735,18 @@ class PathAgent:
                 strategy_instructions=strategy_instructions,
                 evaluation_context=evaluation_context,
             )
-            response = await self.llm.chat(
-                messages=[LLMMessage("user", prompt)],
-                system_prompt="You are a learning path planning expert. Return strict JSON only.",
-                temperature=0.6,
-                max_tokens=4096,
-            )
-            content = response.content.strip()
+            # Course coverage is deterministic. Do not spend a model call on a
+            # short-path proposal that will be replaced by the full curriculum.
+            if course_context.get("chapters"):
+                content = '{"nodes": [], "estimated_total_minutes": 0, "description": ""}'
+            else:
+                response = await self.llm.chat(
+                    messages=[LLMMessage("user", prompt)],
+                    system_prompt="You are a learning path planning expert. Return strict JSON only.",
+                    temperature=0.6,
+                    max_tokens=4096,
+                )
+                content = response.content.strip()
             if "```json" in content:
                 content = content.split("```json")[1].split("```")[0].strip()
             elif "```" in content:
@@ -724,6 +800,13 @@ class PathAgent:
                 f"Generated from shared student state snapshot {student_state['snapshot_id']}."
             )
 
+        # A full-course path must retain every chapter and leaf knowledge point.
+        # Personalisation is applied below to pacing and resource recommendations.
+        nodes = self._build_full_course_nodes(course_context, profile_data)
+        description = (
+            f"Full-course personalised learning path for {target_course['title']}: "
+            f"covers all {len(course_context.get('chapters', []))} chapters."
+        )
         nodes = self._normalize_nodes(nodes, course_context=course_context)
         # Persist the reasoning with every node so the UI can explain the path
         # without asking the model again on every page view.
@@ -738,14 +821,12 @@ class PathAgent:
             existing = await db.execute(
                 select(StudyPath).where(
                     StudyPath.user_id == user_id,
-                    StudyPath.course_id == target_course["id"],
                     StudyPath.is_active == True,
                 )
             )
-            old_path = existing.scalar_one_or_none()
-            if old_path:
+            for old_path in existing.scalars().all():
                 old_path.is_active = False
-                await db.flush()
+            await db.flush()
 
             study_path = StudyPath(
                 user_id=user_id,

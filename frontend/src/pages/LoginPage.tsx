@@ -188,14 +188,14 @@ const LoginPage: React.FC = () => {
 
   const handleLogin = async (values: { username: string; password: string }) => {
     setLoading(true)
-    try { const res = await authApi.login(values.username, values.password); setAuth(res.data.access_token, res.data.user); message.success("登录成功"); navigate("/profile") }
+    try { const res = await authApi.login(values.username, values.password); setAuth(res.data.access_token, res.data.user); message.success("登录成功"); navigate("/dashboard") }
     catch (err: unknown) { message.error((err as any)?.response?.data?.detail || "登录失败，请检查用户名和密码") }
     finally { setLoading(false) }
   }
   const handleRegister = async (values: { username: string; email: string; password: string; confirm: string }) => {
     if (values.password !== values.confirm) { message.error("两次密码不一致"); return }
     setLoading(true)
-    try { const res = await authApi.register({ username: values.username, email: values.email, password: values.password }); setAuth(res.data.access_token, res.data.user); message.success("注册成功"); navigate("/profile") }
+    try { const res = await authApi.register({ username: values.username, email: values.email, password: values.password }); setAuth(res.data.access_token, res.data.user); message.success("注册成功"); navigate("/dashboard") }
     catch (err: unknown) { message.error((err as any)?.response?.data?.detail || "注册失败，请检查信息") }
     finally { setLoading(false) }
   }

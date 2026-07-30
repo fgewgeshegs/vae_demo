@@ -230,7 +230,11 @@ class StudentStateService:
         course_query = select(Course).where(Course.is_active == True)
         if course_id:
             course_query = course_query.where(Course.id == course_id)
-        courses = (await db.execute(course_query.order_by(Course.id))).scalars().all()
+        # The textbook-synchronised course is marked as the seed course. Prefer it
+        # over legacy demo courses while still allowing an explicit course_id.
+        courses = (
+            await db.execute(course_query.order_by(Course.seed_course.desc(), Course.id))
+        ).scalars().all()
 
         target_course = courses[0] if courses else None
         chapters: list[dict[str, Any]] = []

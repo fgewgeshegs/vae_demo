@@ -69,6 +69,19 @@ const LearningPath: React.FC = () => {
     return node?.chapter_title || ''
   }, [activeChapterId, activePath])
   const kpTitle = currentKp?.title || ''
+  const activePathNode = useMemo(() => {
+    if (!activeKpId) return undefined
+    return (activePath?.path_data?.nodes || []).find((node) => (
+      node.knowledge_point_id === activeKpId
+      && (!activeChapterId || !node.chapter_id || node.chapter_id === activeChapterId)
+    ))
+  }, [activeChapterId, activeKpId, activePath])
+  const currentResources = useMemo(() => {
+    const resourceIds = activePathNode?.resource_ids || []
+    if (!resourceIds.length) return resources
+    const allowedIds = new Set(resourceIds)
+    return resources.filter((resource) => allowedIds.has(resource.id))
+  }, [activePathNode?.id, activePathNode?.resource_ids, resources])
   const sectionNumber = useMemo(() => {
     if (!activeChapterId || !activeKpId) return ''
     const chapters = [...courseChapters].sort((a, b) => a.sort_order - b.sort_order)
@@ -292,7 +305,7 @@ const LearningPath: React.FC = () => {
             <ContentViewer
               kp={currentKp}
               sectionNumber={sectionNumber}
-              resources={resources}
+              resources={currentResources}
               resourceLoading={resourceLoading}
               videoTasks={videoTasks}
               activeVideo={activeVideo}

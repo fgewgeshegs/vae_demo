@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from datetime import datetime
-from typing import Any
+from typing import Any, Literal
 
 from pydantic import BaseModel, Field, ConfigDict
 
@@ -34,6 +34,13 @@ class InterestDirectionData(BaseModel):
     areas: list[str] | None = Field(None, description="兴趣方向列表")
 
 
+class ResourcePreferencesData(BaseModel):
+    types: list[Literal["document", "video", "exercise", "code", "mindmap", "reading"]] | None = Field(
+        None,
+        description="偏好的资源形式列表",
+    )
+
+
 # --- 新增: 画像初始化请求（Onboarding） ---
 
 class ProfileFormRequest(BaseModel):
@@ -43,6 +50,7 @@ class ProfileFormRequest(BaseModel):
     learning_goals: LearningGoalsData | None = None
     learning_pace: LearningPaceData | None = None
     interest_direction: InterestDirectionData | None = None
+    resource_preferences: ResourcePreferencesData | None = None
     knowledge_gaps: list[str] | None = None
     weak_points: list[str] | None = None
 

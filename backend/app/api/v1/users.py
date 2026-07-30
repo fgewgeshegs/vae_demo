@@ -85,6 +85,9 @@ async def update_profile(
     if data.interest_direction is not None and data.interest_direction.areas is not None:
         profile_data.setdefault("interest_direction", {})["areas"] = data.interest_direction.areas
 
+    if data.resource_preferences is not None and data.resource_preferences.types is not None:
+        profile_data.setdefault("resource_preferences", {})["types"] = data.resource_preferences.types
+
     if data.knowledge_gaps is not None:
         profile_data["knowledge_gaps"] = data.knowledge_gaps
 

@@ -1,12 +1,13 @@
 import React, { useEffect, useMemo, useState } from 'react'
 import { Button, Card, Empty, Modal, Progress, Space, Spin, Tag, Tooltip, Typography } from 'antd'
-import { EditOutlined, FileTextOutlined, LeftOutlined, PlayCircleOutlined, RightOutlined } from '@ant-design/icons'
+import { EditOutlined, ExpandOutlined, FileTextOutlined, LeftOutlined, PlayCircleOutlined, RightOutlined } from '@ant-design/icons'
 import ReactMarkdown from 'react-markdown'
 import remarkGfm from 'remark-gfm'
 import type { KnowledgePoint, LearningResource, VideoTask } from '../types'
+import { LearningResourceContent } from './ResourceModal'
 import './ContentViewer.css'
 
-const { Title, Text, Paragraph } = Typography
+const { Title, Text } = Typography
 
 const resourceTypeLabels: Record<string, string> = {
   document: '讲义', mindmap: '思维导图', exercise: '练习题',
@@ -16,8 +17,8 @@ const resourceTypeLabels: Record<string, string> = {
 interface LearningStep {
   id: string
   label: string
+  description: string
   resources: LearningResource[]
-  includesLesson: boolean
 }
 
 interface ContentViewerProps {
@@ -46,14 +47,32 @@ const ContentViewer: React.FC<ContentViewerProps> = ({
   const [activeStepIndex, setActiveStepIndex] = useState(0)
   const steps = useMemo<LearningStep[]>(() => {
     const byType = (types: LearningResource['resource_type'][]) => resources.filter((resource) => types.includes(resource.resource_type))
-    const result: LearningStep[] = [{ id: 'understand', label: '理解', resources: byType(['document']), includesLesson: true }]
-    const exampleResources = byType(['video', 'mindmap'])
-    const applyResources = byType(['code', 'reading'])
-    const practiceResources = byType(['exercise'])
-    if (exampleResources.length) result.push({ id: 'example', label: '示例', resources: exampleResources, includesLesson: false })
-    if (applyResources.length) result.push({ id: 'apply', label: '应用', resources: applyResources, includesLesson: false })
-    if (practiceResources.length) result.push({ id: 'practice', label: '练习', resources: practiceResources, includesLesson: false })
-    return result
+    return [
+      {
+        id: 'understand',
+        label: '概念理解',
+        description: '先建立本节的核心概念、学习目标与关键边界。',
+        resources: byType(['document']),
+      },
+      {
+        id: 'example',
+        label: '结构与示例',
+        description: '借助结构图和讲解示例，形成对知识点的整体认识。',
+        resources: byType(['mindmap', 'video']),
+      },
+      {
+        id: 'apply',
+        label: '应用与延伸',
+        description: '将概念迁移到实际场景，并按需阅读扩展材料。',
+        resources: byType(['code', 'reading']),
+      },
+      {
+        id: 'practice',
+        label: '练习与反馈',
+        description: '通过练习检验掌握程度，并定位仍需巩固的内容。',
+        resources: byType(['exercise']),
+      },
+    ]
   }, [resources])
 
   useEffect(() => { setActiveStepIndex(0) }, [kp?.id])
@@ -64,28 +83,20 @@ const ContentViewer: React.FC<ContentViewerProps> = ({
 
   const safeStepIndex = Math.min(activeStepIndex, steps.length - 1)
   const activeStep = steps[safeStepIndex]
-  const renderLesson = () => kp.content ? (
-    <div className="course-content" style={{ marginBottom: 24 }}>
-      <ReactMarkdown
-        remarkPlugins={[remarkGfm]}
-        components={{
-          h1: ({ children }) => <Title level={2} style={{ marginTop: 24 }}>{children}</Title>,
-          h2: ({ children }) => <Title level={3} style={{ marginTop: 20 }}>{children}</Title>,
-          h3: ({ children }) => <Title level={4} style={{ marginTop: 16 }}>{children}</Title>,
-          p: ({ children }) => <Paragraph style={{ lineHeight: 1.8, fontSize: 15, color: '#334155' }}>{children}</Paragraph>,
-          code: ({ className, children, ...props }: any) => !className ? <code style={{ background: '#f1f5f9', padding: '2px 6px', borderRadius: 4, fontSize: 13 }} {...props}>{children}</code> : <pre style={{ background: '#1e293b', color: '#e2e8f0', padding: '16px 20px', borderRadius: 8, overflowX: 'auto', fontSize: 13, lineHeight: 1.6 }}><code className={className} {...props}>{children}</code></pre>,
-          img: ({ src, alt }) => <img src={src} alt={alt} style={{ maxWidth: '100%', borderRadius: 8, margin: '12px 0' }} />,
-          table: ({ children }) => <div style={{ overflowX: 'auto' }}><table style={{ borderCollapse: 'collapse', width: '100%', margin: '12px 0' }}>{children}</table></div>,
-          th: ({ children }) => <th style={{ border: '1px solid #e2e8f0', padding: '8px 12px', background: '#f8fafc', fontWeight: 600, fontSize: 13 }}>{children}</th>,
-          td: ({ children }) => <td style={{ border: '1px solid #e2e8f0', padding: '8px 12px', fontSize: 13 }}>{children}</td>,
-          blockquote: ({ children }) => <blockquote style={{ borderLeft: '3px solid #3b82f6', margin: '12px 0', padding: '8px 16px', background: '#f0f7ff', borderRadius: '0 6px 6px 0' }}>{children}</blockquote>,
-        }}
-      >
-        {kp.content}
-      </ReactMarkdown>
-    </div>
-  ) : <Paragraph type="secondary">暂无详细内容</Paragraph>
-
+  const renderLearningMaterial = (resource: LearningResource) => (
+    <section key={resource.id} className="learning-material">
+      <div className="learning-material__header">
+        <div>
+          <Tag className="learning-material__type">{resourceTypeLabels[resource.resource_type] || resource.resource_type}</Tag>
+          <Title level={5} className="learning-material__title">{resource.title}</Title>
+        </div>
+        <Tooltip title="在弹窗中打开">
+          <Button type="text" icon={<ExpandOutlined />} aria-label={`在弹窗中打开：${resource.title}`} onClick={() => onOpenDetail(resource)} />
+        </Tooltip>
+      </div>
+      <div className="learning-material__content"><LearningResourceContent resource={resource} /></div>
+    </section>
+  )
   const renderResource = (resource: LearningResource) => {
     const videoTask = videoTasks[resource.id]
     const isVideoCompleted = videoTask?.status === 'completed' && videoTask?.video_url
@@ -115,8 +126,8 @@ const ContentViewer: React.FC<ContentViewerProps> = ({
             <Space wrap style={{ marginTop: 8 }}><Tag color="blue">{kp.difficulty || 'medium'}</Tag></Space>
           </div>
           <Title level={4} style={{ marginBottom: 20 }}>{activeStep.label}</Title>
-          {activeStep.includesLesson && renderLesson()}
-          {resourceLoading ? <div style={{ textAlign: 'center', padding: 32 }}><Spin /></div> : activeStep.resources.length ? <div className="learning-step-resources">{activeStep.resources.map(renderResource)}</div> : !activeStep.includesLesson ? <Empty image={Empty.PRESENTED_IMAGE_SIMPLE} description="本步骤暂无学习资源" /> : null}
+          <Text type="secondary" style={{ display: 'block', marginBottom: 20 }}>{activeStep.description}</Text>
+          {resourceLoading ? <div style={{ textAlign: 'center', padding: 32 }}><Spin /></div> : activeStep.resources.length ? <div className="learning-step-resources">{activeStep.resources.map(renderLearningMaterial)}</div> : <Empty image={Empty.PRESENTED_IMAGE_SIMPLE} description="本页资源正在准备中" />}
         </div>
       </div>
 

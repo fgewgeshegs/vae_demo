@@ -5,6 +5,7 @@ import { chatApi } from '../services/api'
 import ReactMarkdown from 'react-markdown'
 import remarkGfm from 'remark-gfm'
 import WorkspacePageHeader from '../components/WorkspacePageHeader'
+import './AgentPage.css'
 
 const { Text } = Typography
 const { TextArea } = Input
@@ -319,35 +320,30 @@ const AgentPage: React.FC = () => {
   }, [])
 
   return (
-    <div className="workspace-page workspace-page--agent" style={{ display: 'flex', flexDirection: 'column', height: 'calc(100vh - 150px)' }}>
+    <div className="workspace-page workspace-page--agent">
       <WorkspacePageHeader title="全局 Agent" description="统一协调知识库、学习画像、路径、资源与评估任务。" metrics={[{ label: '会话消息', value: conversation.length }]} />
-      <div style={{ marginBottom: 16 }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-          <ThunderboltOutlined style={{ fontSize: 20, color: '#7c5bd6' }} />
-          <Text strong style={{ fontSize: 16 }}>全局 Agent</Text>
+      <section className="agent-workspace" aria-label="全局 Agent 会话">
+        <header className="agent-workspace__toolbar">
+          <div className="agent-workspace__identity">
+            <span className="agent-workspace__mark"><ThunderboltOutlined /></span>
+            <div>
+              <Text strong>全局 Agent</Text>
+              <Text type="secondary">向主 Agent 提问，自动协调知识库、画像、路径、资源和评估工具</Text>
+            </div>
+          </div>
           {streaming && (
-            <Button size="small" danger onClick={handleCancel} style={{ marginLeft: 'auto', fontSize: 11 }}>
-              取消
+            <Button size="small" danger onClick={handleCancel}>
+              取消任务
             </Button>
           )}
-        </div>
-        <Text type="secondary" style={{ fontSize: 12, display: 'block', marginTop: 2 }}>
-          向主 Agent 提问，它将自动调用知识库、画像、路径、资源和评估工具
-        </Text>
-      </div>
+        </header>
 
-      <div className="conversation-panel" ref={listRef} style={{
-        flex: 1, overflow: 'auto', padding: 16,
-        background: 'rgba(255, 255, 255, 0.64)',
-        border: '1px solid rgba(72, 102, 153, 0.14)',
-        borderRadius: 8, marginBottom: 12,
-        boxShadow: '0 18px 50px rgba(42,68,112,0.08)',
-      }}>
+        <div className="conversation-panel" ref={listRef}>
         {hasWelcome && conversation.length === 0 && (
-          <div style={{ textAlign: 'center', paddingTop: 60, color: '#94a3b8' }}>
-            <ThunderboltOutlined style={{ fontSize: 40, color: '#cbd5e1', marginBottom: 16 }} />
-            <div style={{ fontSize: 15, color: '#64748b', marginBottom: 8 }}>全局 Agent</div>
-            <div style={{ fontSize: 12, lineHeight: 1.8 }}>
+          <div className="agent-welcome">
+            <span className="agent-welcome__icon"><ThunderboltOutlined /></span>
+            <div className="agent-welcome__title">从一个学习问题开始</div>
+            <div className="agent-welcome__examples">
               <div>试试以下功能：</div>
               <div style={{ marginTop: 4 }}>"更新我的学习画像"</div>
               <div>"生成个性化学习路径"</div>
@@ -372,14 +368,14 @@ const AgentPage: React.FC = () => {
             thinkingSteps={currentThinking} thinkingText={currentThinkingText} thinkingExpanded={true}
             onToggleThinking={() => {}} isStreaming={!currentContent} />
         )}
-      </div>
+        </div>
 
-      <Space.Compact style={{ width: '100%' }}>
+        <Space.Compact className="agent-composer">
         <TextArea value={input} onChange={(e) => setInput(e.target.value)}
           placeholder="向 Agent 提问..."
           autoSize={{ minRows: 1, maxRows: 4 }} disabled={streaming}
           onPressEnter={(e) => { if (!e.shiftKey) { e.preventDefault(); handleSend() } }}
-          style={{ background: '#f8fafc', border: '1px solid #e2e8f0', color: '#0f172a', fontSize: 13, borderRadius: '6px 0 0 6px', resize: 'none' }}
+          style={{ resize: 'none' }}
         />
         <Button type="primary" icon={<SendOutlined />} onClick={handleSend}
           loading={streaming} disabled={!input.trim() || streaming}
@@ -387,6 +383,7 @@ const AgentPage: React.FC = () => {
           {streaming ? '处理中' : '发送'}
         </Button>
       </Space.Compact>
+      </section>
     </div>
   )
 }

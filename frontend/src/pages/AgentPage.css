@@ -1,0 +1,136 @@
+.workspace-content--workspace:has(.workspace-page--agent) {
+  max-width: none;
+  padding: 0;
+}
+
+.workspace-content--workspace .workspace-page--agent {
+  box-sizing: border-box;
+  display: flex;
+  flex-direction: column;
+  height: 100vh;
+  padding: 0;
+}
+
+.workspace-page--agent .workspace-page-header {
+  flex: 0 0 auto;
+  margin-bottom: 0;
+  padding: 26px 32px 17px;
+}
+
+.agent-workspace {
+  background: #fff;
+  border: 1px solid #e1e6ed;
+  border-radius: 10px;
+  display: flex;
+  flex: 1 1 auto;
+  flex-direction: column;
+  min-height: 0;
+  overflow: hidden;
+}
+
+.agent-workspace__toolbar {
+  align-items: center;
+  background: #fbfcfe;
+  border-bottom: 1px solid #e9edf2;
+  display: flex;
+  flex: 0 0 auto;
+  justify-content: space-between;
+  min-height: 64px;
+  padding: 12px 20px;
+}
+
+.agent-workspace__identity {
+  align-items: center;
+  display: flex;
+  gap: 11px;
+  min-width: 0;
+}
+
+.agent-workspace__mark {
+  align-items: center;
+  background: #edf2ff;
+  border: 1px solid #dbe5ff;
+  border-radius: 7px;
+  color: #2858d7;
+  display: inline-flex;
+  flex: 0 0 auto;
+  font-size: 17px;
+  height: 32px;
+  justify-content: center;
+  width: 32px;
+}
+
+.agent-workspace__identity .ant-typography { display: block; }
+.agent-workspace__identity .ant-typography:first-child { font-size: 14px; line-height: 1.35; }
+.agent-workspace__identity .ant-typography-secondary { color: #738097; font-size: 12px; margin-top: 2px; }
+
+.workspace-content--workspace .workspace-page--agent .conversation-panel {
+  background: #fff !important;
+  border: 0 !important;
+  border-radius: 0 !important;
+  box-shadow: none !important;
+  flex: 1 1 auto;
+  margin: 0 !important;
+  min-height: 0;
+  overflow: auto;
+  padding: 24px max(24px, calc((100% - 940px) / 2)) !important;
+}
+
+.agent-welcome {
+  color: #7c889b;
+  margin: 0 auto;
+  max-width: 360px;
+  padding-top: clamp(46px, 11vh, 116px);
+  text-align: center;
+}
+
+.agent-welcome__icon {
+  align-items: center;
+  background: #eef3ff;
+  border-radius: 8px;
+  color: #2858d7;
+  display: inline-flex;
+  font-size: 26px;
+  height: 54px;
+  justify-content: center;
+  margin-bottom: 16px;
+  width: 54px;
+}
+
+.agent-welcome__title { color: #25334d; font-size: 16px; font-weight: 700; margin-bottom: 8px; }
+.agent-welcome__examples { font-size: 12px; line-height: 1.9; }
+
+.workspace-content--workspace .agent-composer {
+  background: #fbfcfe;
+  border-top: 1px solid #e9edf2;
+  display: flex;
+  flex: 0 0 auto;
+  padding: 14px max(20px, calc((100% - 940px) / 2));
+  width: 100%;
+}
+
+.workspace-content--workspace .agent-composer .ant-input {
+  background: #fff !important;
+  border: 1px solid #dce2ea !important;
+  border-radius: 8px 0 0 8px !important;
+  min-height: 38px;
+  padding: 8px 12px;
+}
+
+.workspace-content--workspace .agent-composer .ant-btn {
+  border-radius: 0 8px 8px 0;
+  height: auto;
+  min-width: 88px;
+}
+
+@media (max-width: 767px) {
+  .workspace-content--workspace:has(.workspace-page--agent) { padding: 0; }
+  .workspace-content--workspace .workspace-page--agent { height: 100vh; padding: 0; }
+  .workspace-page--agent .workspace-page-header { padding: 18px 14px 16px; }
+  .agent-workspace__toolbar { padding: 11px 14px; }
+  .agent-workspace__identity .ant-typography-secondary { max-width: 240px; }
+  .workspace-content--workspace .workspace-page--agent .conversation-panel { padding: 20px 16px !important; }
+  .workspace-content--workspace .agent-composer { padding: 10px 12px; }
+  .workspace-content--workspace .agent-composer .ant-btn { min-width: 48px; }
+  .workspace-content--workspace .agent-composer .ant-btn > span:not(.anticon) { display: none; }
+}

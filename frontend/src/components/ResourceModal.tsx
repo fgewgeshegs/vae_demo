@@ -750,11 +750,48 @@ const VideoProductionPackPanel: React.FC<{ pack?: VideoProductionPack }> = ({ pa
   )
 }
 
+export const LearningResourceContent: React.FC<{ resource: LearningResource }> = ({ resource }) => {
+  const mermaidSource = extractMermaidSource(resource.content || '')
+  const isMindmapResource = mermaidSource.trimStart().startsWith('mindmap')
+  const videoLesson = resource.resource_type === 'video' ? parseVideoLikeSlides(resource.content || '') : null
+
+  if (videoLesson) {
+    return <>
+      <VideoLikeSlidesPlayer lesson={videoLesson} />
+      <VideoProductionPackPanel pack={videoLesson.production_pack} />
+    </>
+  }
+
+  if (isMindmapResource) {
+    return <div style={{ background: 'rgba(246,249,255,0.86)', padding: 16, borderRadius: 8, overflow: 'auto', border: '1px solid rgba(72,102,153,0.12)' }}>
+      <Text type="secondary" style={{ marginBottom: 12, display: 'block' }}>思维导图</Text>
+      <MermaidMindmap source={mermaidSource} />
+    </div>
+  }
+
+  return <ReactMarkdown
+    remarkPlugins={[remarkGfm]}
+    components={{
+      code({ className, children, ...props }) {
+        const isMermaid = (className || '').toLowerCase().includes('language-mermaid')
+        if (isMermaid) {
+          const source = String(children).trim()
+          const isMindmap = source.trimStart().startsWith('mindmap')
+          return <div style={{ background: 'rgba(246,249,255,0.86)', padding: 16, borderRadius: 8, overflow: 'auto', border: '1px solid rgba(72,102,153,0.12)' }}>
+            <Text type="secondary" style={{ marginBottom: 12, display: 'block' }}>{isMindmap ? '思维导图' : 'Mermaid 图表'}</Text>
+            {isMindmap ? <MermaidMindmap source={source} /> : <pre style={{ margin: 0, whiteSpace: 'pre-wrap', fontSize: 13, lineHeight: 1.6 }}>{source}</pre>}
+          </div>
+        }
+        return <code className={className} {...props}>{children}</code>
+      },
+    }}
+  >
+    {resource.content || '暂无内容'}
+  </ReactMarkdown>
+}
+
 const ResourceModal: React.FC<ResourceModalProps> = ({ resource, open, loading, onClose }) => {
   const config = resource ? resourceTypeConfig[resource.resource_type] : null
-  const mermaidSource = resource ? extractMermaidSource(resource.content || '') : ''
-  const isMindmapResource = mermaidSource.trimStart().startsWith('mindmap')
-  const videoLesson = resource?.resource_type === 'video' ? parseVideoLikeSlides(resource.content || '') : null
 
   return (
     <Modal
@@ -782,49 +819,7 @@ const ResourceModal: React.FC<ResourceModalProps> = ({ resource, open, loading, 
         </div>
       ) : resource ? (
         <div className="resource-modal-content">
-          {videoLesson ? (
-            <>
-              <VideoLikeSlidesPlayer lesson={videoLesson} />
-              <VideoProductionPackPanel pack={videoLesson.production_pack} />
-            </>
-          ) : isMindmapResource ? (
-            <div style={{ background: 'rgba(246,249,255,0.86)', padding: 16, borderRadius: 8, overflow: 'auto', border: '1px solid rgba(72,102,153,0.12)' }}>
-              <Text type="secondary" style={{ marginBottom: 12, display: 'block' }}>思维导图</Text>
-              <MermaidMindmap source={mermaidSource} />
-            </div>
-          ) : (
-            <ReactMarkdown
-              remarkPlugins={[remarkGfm]}
-              components={{
-                code({ className, children, ...props }) {
-                  const isMermaid = (className || '').toLowerCase().includes('language-mermaid')
-                  if (isMermaid) {
-                    const source = String(children).trim()
-                    const isMindmap = source.trimStart().startsWith('mindmap')
-                    return (
-                      <div style={{ background: 'rgba(246,249,255,0.86)', padding: 16, borderRadius: 8, overflow: 'auto', border: '1px solid rgba(72,102,153,0.12)' }}>
-                        <Text type="secondary" style={{ marginBottom: 12, display: 'block' }}>
-                          {isMindmap ? '思维导图' : 'Mermaid 图表'}
-                        </Text>
-                        {isMindmap ? (
-                          <MermaidMindmap source={source} />
-                        ) : (
-                          <pre style={{ margin: 0, whiteSpace: 'pre-wrap', fontSize: 13, lineHeight: 1.6 }}>{source}</pre>
-                        )}
-                      </div>
-                    )
-                  }
-                  return (
-                    <code className={className} {...props}>
-                      {children}
-                    </code>
-                  )
-                },
-              }}
-            >
-              {resource.content || ''}
-            </ReactMarkdown>
-          )}
+          <LearningResourceContent resource={resource} />
         </div>
       ) : (
         <Empty description="无法加载资源内容" />
